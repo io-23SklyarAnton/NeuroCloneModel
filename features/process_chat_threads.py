@@ -84,13 +84,15 @@ class CommandHandler:
             chat_id: Chat.ExternalID,
     ):
         if message.has_reply_message_id():
-            return await self._determine_replied_message_thread(message, chat_id)
+            return await self._determine_replied_message_thread(
+                message=message,
+                chat_id=chat_id,
+            )
         else:
             return await self._determine_non_replied_message_thread(
-                i,
-                message,
-                messages_sub,
-                chat_id
+                i=i,
+                message=message,
+                messages_sub=messages_sub,
             )
 
     async def _determine_replied_message_thread(
@@ -115,7 +117,6 @@ class CommandHandler:
             i: int,
             message: Message,
             messages_sub: list[Message],
-            chat_id: Chat.ExternalID,
     ):
         clipped_messages_sub: list[Message] = self._clip_messages_sub(
             messages_sub,
@@ -147,7 +148,7 @@ class CommandHandler:
                     parsed_thread_decision.thread_decision.thread_id
                 )
 
-    async def _get_chat_by_id(self, chat_id: ID) -> Chat:
+    async def _get_chat_by_id(self, chat_id: Chat.ExternalID) -> Chat:
         return await self._uow.chat.get_by_id_or_raise(chat_id)
 
     async def _get_batch_of_messages(
