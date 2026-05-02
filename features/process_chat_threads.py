@@ -100,10 +100,12 @@ class CommandHandler:
             message: Message,
             chat_id: Chat.ExternalID,
     ):
-        thread: Optional[Thread] = await self._get_thread_by_message_external_id_and_chat_id(
-            message_external_id=message.external_id,
-            chat_id=chat_id,
-        )
+        thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_external_id(message.external_id)
+        if thread is None:
+            thread = await self._get_thread_by_message_external_id_and_chat_id(
+                message_external_id=message.external_id,
+                chat_id=chat_id,
+            )
 
         if thread is None:
             return
@@ -272,6 +274,17 @@ class CommandHandler:
                 return thread
 
         raise ValueError(f"Thread with id {thread_id} not found in active threads")
+
+    def _get_thread_from_active_threads_by_message_external_id(
+            self,
+            message_external_id: Message.ExternalID,
+    ) -> Optional[Thread]:
+        for thread in self._active_threads:
+            for message in thread.recent_messages:
+                if message.external_id == message_external_id:
+                    return thread
+
+        return None
 
     @classmethod
     def _get_time_display(
