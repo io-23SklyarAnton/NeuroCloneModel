@@ -104,7 +104,6 @@ class CommandHandler:
         )
 
         if thread is None:
-            print("WARNING! NO THREAD FOUND")
             return
 
         self._add_thread_to_active(thread)
@@ -189,78 +188,107 @@ class CommandHandler:
             clipped_messages_sub: list[Message],
             warning_message: Optional[str],
     ) -> str:
+        return self._template.render(
+            active_threads=self._format_active_threads(),
+            target_message=self._format_target_message(message),
+            future_messages=self._format_future_messages(
+                messages_sub=clipped_messages_sub,
+                start_unix=message.date_unixtime
+            ),
+            warning_message=warning_message,
+        )
+
+    def _format_active_threads(self) -> list[dict]:
         active_threads_data = []
         for thread in self._active_threads:
-            thread_messages_data = []
-            previous_unix = None
+            active_threads_data.append(self._format_thread(thread))
 
-            recent_messages = thread.messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
+        return active_threads_data
 
-            for message in recent_messages:
-                thread_messages_data.append({
-                    "time_display": self._get_time_display(
-                        current_unix=message.date_unixtime,
-                        previous_unix=previous_unix,
-                    ),
-                    "sender": message.from_user,
-                    "text": message.text
-                })
-                previous_unix = message.date_unixtime
+    def _format_thread(self, thread: Thread) -> dict:
+        recent_messages = thread.messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
+        last_timestamp = self._format_timestamp(recent_messages[-1].date_unixtime)
 
-            active_threads_data.append({
-                "id": thread.id,
-                "summary": thread.summary,
-                "last_timestamp": self._get_time_display(recent_messages[-1].date_unixtime, None),
-                "messages": thread_messages_data
-            })
-
-        target_message_data = {
-            "time_display": self._get_time_display(message.date_unixtime, None),
-            "sender": message.from_user,
-            "text": message.text
+        return {
+            "id": thread.id,
+            "summary": thread.summary,
+            "last_timestamp": last_timestamp,
+            "messages": self._format_thread_messages(recent_messages)
         }
 
-        future_messages_data = []
-        previous_unix = message.date_unixtime
-        for message in clipped_messages_sub:
-            future_messages_data.append({
-                "time_display": self._get_time_display(message.date_unixtime, previous_unix),
+    def _format_thread_messages(self, messages: list[Message]) -> list[dict]:
+        thread_messages_data = []
+        previous_unix = None
+
+        for message in messages:
+            thread_messages_data.append({
+                "time_display": self._get_time_display(
+                    current_unix=message.date_unixtime,
+                    previous_unix=previous_unix
+                ),
                 "sender": message.from_user,
                 "text": message.text
             })
             previous_unix = message.date_unixtime
 
-        prompt = self._template.render(
-            active_threads=active_threads_data,
-            target_message=target_message_data,
-            future_messages=future_messages_data,
-            warning_message=warning_message,
-        )
+        return thread_messages_data
 
-        return prompt
+    def _format_target_message(self, message: Message) -> dict:
+        return {
+            "time_display": self._format_timestamp(message.date_unixtime),
+            "sender": message.from_user,
+            "text": message.text
+        }
 
-    @staticmethod
+    def _format_future_messages(
+            self,
+            messages_sub: list[Message],
+            start_unix: int
+    ) -> list[dict]:
+        future_messages_data = []
+        previous_unix = start_unix
+        for message in messages_sub:
+            future_messages_data.append({
+                "time_display": self._get_time_display(
+                    current_unix=message.date_unixtime,
+                    previous_unix=previous_unix
+                ),
+                "sender": message.from_user,
+                "text": message.text
+            })
+            previous_unix = message.date_unixtime
+        return future_messages_data
+
+    @classmethod
     def _get_time_display(
+            cls,
             current_unix: int,
             previous_unix: Optional[int]
     ) -> str:
-        current_dt = datetime.datetime.fromtimestamp(current_unix)
-        base_str = current_dt.strftime("%Y-%m-%d %H:%M:%S")
+        base_str = cls._format_timestamp(current_unix)
 
         if previous_unix is None:
             return base_str
 
+        delta_str = cls._calculate_time_delta(current_unix, previous_unix)
+        return f"{base_str} | {delta_str}"
+
+    @staticmethod
+    def _format_timestamp(unix_time: int) -> str:
+        return datetime.datetime.fromtimestamp(unix_time).strftime("%Y-%m-%d %H:%M:%S")
+
+    @staticmethod
+    def _calculate_time_delta(
+            current_unix: int,
+            previous_unix: int,
+    ) -> str:
         delta_seconds = current_unix - previous_unix
         if delta_seconds <= 0:
-            return f"{base_str} | +0s"
-
+            return "+0s"
         if delta_seconds < 60:
-            delta_str = f"+{delta_seconds}s"
-        elif delta_seconds < 3600:
-            delta_str = f"+{delta_seconds // 60}m"
-        elif delta_seconds < 86400:
-            delta_str = f"+{delta_seconds // 3600}h"
-        else:
-            delta_str = f"+{delta_seconds // 86400}d"
-
-        return f"{base_str} | {delta_str}"
+            return f"+{delta_seconds}s"
+        if delta_seconds < 3600:
+            return f"+{delta_seconds // 60}m"
+        if delta_seconds < 86400:
+            return f"+{delta_seconds // 3600}h"
+        return f"+{delta_seconds // 86400}d"
