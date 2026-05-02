@@ -12,6 +12,7 @@ from domain.entities.message import Message
 from domain.value_objects import ID
 from features import interfaces
 from features.base import ICommand
+from llm import IInferenceEngine
 
 
 class Command(ICommand):
@@ -20,7 +21,6 @@ class Command(ICommand):
 
 class CommandHandler:
     class ThreadDecision(pydantic.BaseModel):
-        reason: str
         thread_id: Optional[ID]
         is_new_thread: bool
 
@@ -33,13 +33,22 @@ class CommandHandler:
 
     class ParsedThreadDecision(pydantic.BaseModel):
         error_message: Optional[str]
-        thread_decision: "CommandHandler.ThreadDecision"
+        thread_decision: Optional["CommandHandler.ThreadDecision"]
+
+        @pydantic.model_validator(mode='after')
+        def validate_error_and_decision(self) -> Self:
+            if self.error_message is not None:
+                assert self.thread_decision is None
+            else:
+                assert self.thread_decision is not None
 
     def __init__(
             self,
             uow: interfaces.IUnitOfWork,
+            inference_engine: IInferenceEngine,
     ):
         self._uow = uow
+        self._inference_engine = inference_engine
         self._active_threads: dict[ID, Thread] = {}
 
         self._jinja_env = jinja2.Environment(autoescape=False)
@@ -124,16 +133,22 @@ class CommandHandler:
         )
         warning_message: str = ""
 
+        thread_mapping: dict[int, ID] = {
+            idx: thread_id for idx, thread_id in enumerate(self._active_threads.keys(), 1)
+        }
+
         for _ in range(constants.N_ATTEMPTS):
             prompt: str = self._get_prompt(
-                message,
-                clipped_messages_sub,
-                warning_message
+                message=message,
+                clipped_messages_sub=clipped_messages_sub,
+                warning_message=warning_message,
+                thread_mapping=thread_mapping,
             )
-            raw_thread_decision: str = self._get_decision(prompt)
+            raw_thread_decision: str = await self._get_decision(prompt)
 
             parsed_thread_decision: "CommandHandler.ParsedThreadDecision" = self._parse_thread_decision(
-                raw_thread_decision,
+                raw_thread_decision=raw_thread_decision,
+                thread_mapping=thread_mapping,
             )
             if parsed_thread_decision.error_message is not None:
                 warning_message += f"{parsed_thread_decision.error_message}\n"
@@ -190,9 +205,10 @@ class CommandHandler:
             message: Message,
             clipped_messages_sub: list[Message],
             warning_message: Optional[str],
+            thread_mapping: dict[int, ID]
     ) -> str:
         return self._template.render(
-            active_threads=self._format_active_threads(),
+            active_threads=self._format_active_threads(thread_mapping),
             target_message=self._format_target_message(message),
             future_messages=self._format_future_messages(
                 messages_sub=clipped_messages_sub,
@@ -201,19 +217,69 @@ class CommandHandler:
             warning_message=warning_message,
         )
 
-    def _format_active_threads(self) -> list[dict]:
+    async def _get_decision(self, prompt: str) -> str:
+        return await self._inference_engine.generate_async(
+            prompt=prompt,
+            lora_path=None,
+            max_tokens=constants.MAX_TOKENS_THREAD_DECISION,
+            temp=constants.TEMP_THREAD_DECISION,
+        )
+
+    def _parse_thread_decision(
+            self,
+            raw_thread_decision: str,
+            thread_mapping: dict[int, ID]
+    ) -> "CommandHandler.ParsedThreadDecision":
+        cleaned_output = raw_thread_decision.strip().strip('.')
+
+        try:
+            short_id = int(cleaned_output)
+        except ValueError:
+            return self.ParsedThreadDecision(
+                error_message=f"Invalid output format. Expected integer, got: '{raw_thread_decision}'",
+                thread_decision=None
+            )
+
+        if short_id == 0:
+            return self.ParsedThreadDecision(
+                error_message=None,
+                thread_decision=self.ThreadDecision(
+                    thread_id=None,
+                    is_new_thread=True
+                )
+            )
+
+        real_id: Optional[ID] = thread_mapping.get(short_id)
+        if real_id is None:
+            return self.ParsedThreadDecision(
+                error_message=f"Invalid Thread ID: {short_id}. Must be 0 or one of {list(thread_mapping.keys())}",
+                thread_decision=None
+            )
+
+        return self.ParsedThreadDecision(
+            error_message=None,
+            thread_decision=self.ThreadDecision(
+                thread_id=real_id,
+                is_new_thread=False
+            )
+        )
+
+    def _format_active_threads(self, thread_mapping: dict[int, ID]) -> list[dict]:
         active_threads_data = []
+        reverse_mapping = {v: k for k, v in thread_mapping.items()}
+
         for thread in self._active_threads.values():
-            active_threads_data.append(self._format_thread(thread))
+            short_id = reverse_mapping[thread.id]
+            active_threads_data.append(self._format_thread(thread, short_id))
 
         return active_threads_data
 
-    def _format_thread(self, thread: Thread) -> dict:
+    def _format_thread(self, thread: Thread, short_id: int) -> dict:
         recent_messages = thread.recent_messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
         last_timestamp = self._format_timestamp(recent_messages[-1].date_unixtime)
 
         return {
-            "id": thread.id,
+            "id": short_id,
             "summary": thread.summary,
             "last_timestamp": last_timestamp,
             "messages": self._format_thread_messages(recent_messages)
