@@ -1,9 +1,11 @@
+import datetime
 from typing import Optional
-
 import pydantic
 from typing_extensions import Self
 
-from constants import BATCH_SIZE_DIALOGUE_DISENTANGLEMENT, W_SUB, N_ATTEMPTS
+import jinja2
+
+import constants
 from domain.entities import Thread
 from domain.entities.chat import Chat
 from domain.entities.message import Message
@@ -40,19 +42,22 @@ class CommandHandler:
         self._uow = uow
         self._active_threads: list[Thread] = []
 
+        self._jinja_env = jinja2.Environment(autoescape=False)
+        self._template = self._jinja_env.from_string(constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE)
+
     async def handle(self, command: Command) -> None:
         chat: Chat = await self._get_chat_by_id(command.chat_id)
 
-        for offset in range(0, chat.n_messages, BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
+        for offset in range(0, chat.n_messages, constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
             messages: list[Message] = await self._get_batch_of_messages(
                 chat_id=command.chat_id,
                 offset=offset,
-                limit=BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+                limit=constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
             )
             messages_sub: list[Message] = await self._get_batch_of_messages(
                 chat_id=command.chat_id,
                 offset=offset + 1,
-                limit=W_SUB + BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+                limit=constants.W_SUB + constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
             )
 
             for i, message in enumerate(messages, 1):
@@ -119,7 +124,7 @@ class CommandHandler:
         )
         warning_message: str = ""
 
-        for _ in range(N_ATTEMPTS):
+        for _ in range(constants.N_ATTEMPTS):
             prompt: str = self._get_prompt(
                 message,
                 clipped_messages_sub,
@@ -176,12 +181,86 @@ class CommandHandler:
             messages_sub: list[Message],
             i: int,
     ) -> list[Message]:
-        return messages_sub[i:W_SUB + 1]
+        return messages_sub[i:constants.W_SUB + 1]
 
     def _get_prompt(
             self,
             message: Message,
             clipped_messages_sub: list[Message],
-            warning_message: str,
+            warning_message: Optional[str],
     ) -> str:
-        pass
+        active_threads_data = []
+        for thread in self._active_threads:
+            thread_messages_data = []
+            previous_unix = None
+
+            recent_messages = thread.messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
+
+            for message in recent_messages:
+                thread_messages_data.append({
+                    "time_display": self._get_time_display(
+                        current_unix=message.date_unixtime,
+                        previous_unix=previous_unix,
+                    ),
+                    "sender": message.from_user,
+                    "text": message.text
+                })
+                previous_unix = message.date_unixtime
+
+            active_threads_data.append({
+                "id": thread.id,
+                "summary": thread.summary,
+                "last_timestamp": self._get_time_display(recent_messages[-1].date_unixtime, None),
+                "messages": thread_messages_data
+            })
+
+        target_message_data = {
+            "time_display": self._get_time_display(message.date_unixtime, None),
+            "sender": message.from_user,
+            "text": message.text
+        }
+
+        future_messages_data = []
+        previous_unix = message.date_unixtime
+        for message in clipped_messages_sub:
+            future_messages_data.append({
+                "time_display": self._get_time_display(message.date_unixtime, previous_unix),
+                "sender": message.from_user,
+                "text": message.text
+            })
+            previous_unix = message.date_unixtime
+
+        prompt = self._template.render(
+            active_threads=active_threads_data,
+            target_message=target_message_data,
+            future_messages=future_messages_data,
+            warning_message=warning_message,
+        )
+
+        return prompt
+
+    @staticmethod
+    def _get_time_display(
+            current_unix: int,
+            previous_unix: Optional[int]
+    ) -> str:
+        current_dt = datetime.datetime.fromtimestamp(current_unix)
+        base_str = current_dt.strftime("%Y-%m-%d %H:%M:%S")
+
+        if previous_unix is None:
+            return base_str
+
+        delta_seconds = current_unix - previous_unix
+        if delta_seconds <= 0:
+            return f"{base_str} | +0s"
+
+        if delta_seconds < 60:
+            delta_str = f"+{delta_seconds}s"
+        elif delta_seconds < 3600:
+            delta_str = f"+{delta_seconds // 60}m"
+        elif delta_seconds < 86400:
+            delta_str = f"+{delta_seconds // 3600}h"
+        else:
+            delta_str = f"+{delta_seconds // 86400}d"
+
+        return f"{base_str} | {delta_str}"
