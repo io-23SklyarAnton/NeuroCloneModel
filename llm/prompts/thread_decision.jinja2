@@ -148,4 +148,9 @@ Recent Messages:
 No future messages available.
 {% endif %}
 
+{% if warning_message %}
+### SYSTEM WARNING FROM PREVIOUS ATTEMPT
+{{ warning_message }}
+Please fix the error and output ONLY the exact integer Thread ID (or 0). No other text is allowed.
+{% endif %}
 ### OUTPUT
