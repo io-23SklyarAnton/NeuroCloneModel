@@ -79,7 +79,9 @@ class CommandHandler:
 
                 if determined_thread is not None:
                     determined_thread.add_message(message)
-                    await self._update_active_threads()
+                    if determined_thread.needs_summary_update():
+                        new_summary = await self._generate_thread_summary(determined_thread)
+                        determined_thread.update_summary(new_summary)
 
                 self._remove_outdated_threads(message.sequence_number)
 
@@ -91,22 +93,24 @@ class CommandHandler:
             chat_id: Chat.ExternalID,
     ):
         if message.has_reply_message_id():
-            return await self._determine_replied_message_thread(
+            thread: Optional[Thread] = await self._determine_replied_message_thread(
                 message=message,
                 chat_id=chat_id,
             )
-        else:
-            return await self._determine_non_replied_message_thread(
-                i=i,
-                message=message,
-                messages_sub=messages_sub,
-            )
+            if thread is not None:
+                return thread
+
+        return await self._determine_non_replied_message_thread(
+            i=i,
+            message=message,
+            messages_sub=messages_sub,
+        )
 
     async def _determine_replied_message_thread(
             self,
             message: Message,
             chat_id: Chat.ExternalID,
-    ):
+    ) -> Optional[Thread]:
         thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_external_id(message.external_id)
         if thread is None:
             thread = await self._get_thread_by_message_external_id_and_chat_id(
@@ -162,6 +166,11 @@ class CommandHandler:
                 return self._get_thread_from_active_threads_by_id(
                     parsed_thread_decision.thread_decision.thread_id
                 )
+
+        print("Warning: Failed to parse thread decision after multiple attempts. Assigning to new thread by default.")
+        new_thread: Thread = self._create_thread(message)
+        self._add_thread_to_active(new_thread)
+        return new_thread
 
     async def _get_chat_by_id(self, chat_id: Chat.ExternalID) -> Chat:
         return await self._uow.chat.get_by_id_or_raise(chat_id)
@@ -355,12 +364,6 @@ class CommandHandler:
                     return thread
 
         return None
-
-    async def _update_active_threads(self):
-        for thread in self._active_threads.values():
-            if thread.needs_summary_update():
-                new_summary = await self._generate_thread_summary(thread)
-                thread.update_summary(new_summary)
 
     def _remove_outdated_threads(
             self,
