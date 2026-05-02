@@ -40,7 +40,7 @@ class CommandHandler:
             uow: interfaces.IUnitOfWork,
     ):
         self._uow = uow
-        self._active_threads: list[Thread] = []
+        self._active_threads: dict[ID, Thread] = {}
 
         self._jinja_env = jinja2.Environment(autoescape=False)
         self._template = self._jinja_env.from_string(constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE)
@@ -69,12 +69,10 @@ class CommandHandler:
                 )
 
                 if determined_thread is not None:
-                    await self._update_active_threads(
-                        message,
-                        determined_thread
-                    )
+                    determined_thread.add_message(message)
+                    await self._update_active_threads()
 
-                await self._remove_outdated_threads(message.sequence_number)
+                self._remove_outdated_threads(message.sequence_number)
 
     async def _determine_message_thread(
             self,
@@ -176,14 +174,16 @@ class CommandHandler:
         )
 
     def _add_thread_to_active(self, thread: Thread) -> None:
-        self._active_threads.append(thread)
+        self._active_threads[thread.id] = thread
 
     def _clip_messages_sub(
             self,
             messages_sub: list[Message],
             i: int,
     ) -> list[Message]:
-        return messages_sub[i:constants.W_SUB + 1]
+        start_idx = i - 1
+        end_idx = start_idx + constants.W_SUB
+        return messages_sub[start_idx:end_idx]
 
     def _get_prompt(
             self,
@@ -203,13 +203,13 @@ class CommandHandler:
 
     def _format_active_threads(self) -> list[dict]:
         active_threads_data = []
-        for thread in self._active_threads:
+        for thread in self._active_threads.values():
             active_threads_data.append(self._format_thread(thread))
 
         return active_threads_data
 
     def _format_thread(self, thread: Thread) -> dict:
-        recent_messages = thread.messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
+        recent_messages = thread.recent_messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
         last_timestamp = self._format_timestamp(recent_messages[-1].date_unixtime)
 
         return {
@@ -269,9 +269,9 @@ class CommandHandler:
             self,
             thread_id: ID,
     ) -> Optional[Thread]:
-        for thread in self._active_threads:
-            if thread.id == thread_id:
-                return thread
+        thread = self._active_threads.get(thread_id)
+        if thread is not None:
+            return thread
 
         raise ValueError(f"Thread with id {thread_id} not found in active threads")
 
@@ -279,12 +279,40 @@ class CommandHandler:
             self,
             message_external_id: Message.ExternalID,
     ) -> Optional[Thread]:
-        for thread in self._active_threads:
+        for thread in self._active_threads.values():
             for message in thread.recent_messages:
                 if message.external_id == message_external_id:
                     return thread
 
+            for message in thread.uncommitted_messages:
+                if message.external_id == message_external_id:
+                    return thread
+
         return None
+
+    async def _update_active_threads(self):
+        for thread in self._active_threads.values():
+            if thread.needs_summary_update():
+                new_summary = await self._generate_thread_summary(thread)
+                thread.update_summary(new_summary)
+
+    def _remove_outdated_threads(
+            self,
+            current_seq_num: Message.SequenceNumber,
+    ) -> None:
+        for thread in list(self._active_threads.values()):
+            last_message_seq_num: Message.SequenceNumber = thread.recent_messages[-1].sequence_number
+            if current_seq_num.value - last_message_seq_num.value >= constants.W_PREV:
+                del self._active_threads[thread.id]
+
+        if len(self._active_threads) > constants.N_ACTIVE_THREADS:
+            sorted_threads = sorted(
+                self._active_threads.values(),
+                key=lambda t: t.recent_messages[-1].sequence_number.value,
+                reverse=True
+            )
+            for thread in list(sorted_threads[constants.N_ACTIVE_THREADS:]):
+                del self._active_threads[thread.id]
 
     @classmethod
     def _get_time_display(
