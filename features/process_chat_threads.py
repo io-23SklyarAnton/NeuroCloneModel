@@ -105,10 +105,10 @@ class CommandHandler:
                 chat_id=chat_id,
             )
 
-        if thread is None:
-            return
+            if thread is None:
+                return
 
-        self._add_thread_to_active(thread)
+            self._add_thread_to_active(thread)
 
         return thread
 
@@ -311,7 +311,7 @@ class CommandHandler:
                 key=lambda t: t.recent_messages[-1].sequence_number.value,
                 reverse=True
             )
-            for thread in list(sorted_threads[constants.N_ACTIVE_THREADS:]):
+            for thread in sorted_threads[constants.N_ACTIVE_THREADS:]:
                 del self._active_threads[thread.id]
 
     @classmethod
