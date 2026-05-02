@@ -260,6 +260,19 @@ class CommandHandler:
             previous_unix = message.date_unixtime
         return future_messages_data
 
+    def _create_thread(self, message: Message) -> Thread:
+        return Thread.create(message=message)
+
+    def _get_thread_from_active_threads_by_id(
+            self,
+            thread_id: ID,
+    ) -> Optional[Thread]:
+        for thread in self._active_threads:
+            if thread.id == thread_id:
+                return thread
+
+        raise ValueError(f"Thread with id {thread_id} not found in active threads")
+
     @classmethod
     def _get_time_display(
             cls,

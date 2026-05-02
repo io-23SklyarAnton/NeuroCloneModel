@@ -44,3 +44,15 @@ class Thread(Aggregate):
     @property
     def recent_messages(self) -> list[Message]:
         return self._recent_messages
+
+    @classmethod
+    def create(
+            cls,
+            message: Message,
+    ) -> "Thread":
+        return cls(
+            id_=ID.create(),
+            summary=None,
+            last_summary_seq_num=message.sequence_number,
+            recent_messages=[message],
+        )
