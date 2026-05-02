@@ -52,7 +52,8 @@ class CommandHandler:
         self._active_threads: dict[ID, Thread] = {}
 
         self._jinja_env = jinja2.Environment(autoescape=False)
-        self._template = self._jinja_env.from_string(constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE)
+        self._disentanglement_template = self._jinja_env.from_string(constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE)
+        self._thread_summary_template = self._jinja_env.from_string(constants.THREAD_SUMMARY_TEMPLATE)
 
     async def handle(self, command: Command) -> None:
         chat: Chat = await self._get_chat_by_id(command.chat_id)
@@ -129,6 +130,34 @@ class CommandHandler:
             message=message,
             messages_sub=messages_sub,
         )
+
+    async def _generate_thread_summary(
+            self,
+            thread: Thread,
+    ) -> Thread.Summary:
+        recent_messages = thread.recent_messages[-constants.N_LAST_MESSAGES_FOR_SUMMARY:]
+
+        messages_data = [
+            {
+                "sender": message.from_user.value,
+                "text": message.text.value,
+            }
+            for message in recent_messages
+        ]
+
+        prompt: str = self._thread_summary_template.render(
+            previous_summary=getattr(thread.summary.value, 'value', None),
+            messages=messages_data,
+        )
+
+        raw_summary: str = await self._inference_engine.generate_async(
+            prompt=prompt,
+            lora_path=None,
+            max_tokens=constants.MAX_TOKENS_THREAD_SUMMARY,
+            temp=constants.TEMP_THREAD_SUMMARY,
+        )
+
+        return Thread.Summary(value=raw_summary.strip())
 
     async def _determine_replied_message_thread(
             self,
@@ -276,7 +305,7 @@ class CommandHandler:
             warning_message: Optional[str],
             thread_mapping: dict[int, ID],
     ) -> str:
-        return self._template.render(
+        return self._disentanglement_template.render(
             active_threads=self._format_active_threads(thread_mapping),
             target_message=self._format_target_message(message),
             future_messages=self._format_future_messages(
@@ -372,7 +401,7 @@ class CommandHandler:
 
         return {
             "id": short_id,
-            "summary": thread.summary,
+            "summary": thread.summary.value,
             "last_timestamp": last_timestamp,
             "messages": self._format_thread_messages(messages=recent_messages),
         }
@@ -391,7 +420,7 @@ class CommandHandler:
                     previous_unix=previous_unix,
                 ),
                 "sender": message.from_user.value,
-                "text": message.text,
+                "text": message.text.value,
             })
             previous_unix = message.date_unixtime
 
@@ -404,7 +433,7 @@ class CommandHandler:
         return {
             "time_display": self._format_timestamp(message.date_unixtime),
             "sender": message.from_user.value,
-            "text": message.text,
+            "text": message.text.value,
         }
 
     def _format_future_messages(
@@ -421,7 +450,7 @@ class CommandHandler:
                     previous_unix=previous_unix,
                 ),
                 "sender": message.from_user.value,
-                "text": message.text,
+                "text": message.text.value,
             })
             previous_unix = message.date_unixtime
 
