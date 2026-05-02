@@ -9,7 +9,7 @@ import constants
 from domain.entities import Thread
 from domain.entities.chat import Chat
 from domain.entities.message import Message
-from domain.value_objects import ID
+from domain.value_objects import ID, DateUnixtime
 from features import interfaces
 from features.base import ICommand
 from llm import IInferenceEngine
@@ -390,7 +390,7 @@ class CommandHandler:
                     current_unix=message.date_unixtime,
                     previous_unix=previous_unix,
                 ),
-                "sender": message.from_user,
+                "sender": message.from_user.value,
                 "text": message.text,
             })
             previous_unix = message.date_unixtime
@@ -403,14 +403,14 @@ class CommandHandler:
     ) -> dict:
         return {
             "time_display": self._format_timestamp(message.date_unixtime),
-            "sender": message.from_user,
+            "sender": message.from_user.value,
             "text": message.text,
         }
 
     def _format_future_messages(
             self,
             messages_sub: list[Message],
-            start_unix: int,
+            start_unix: DateUnixtime,
     ) -> list[dict]:
         future_messages_data = []
         previous_unix = start_unix
@@ -420,7 +420,7 @@ class CommandHandler:
                     current_unix=message.date_unixtime,
                     previous_unix=previous_unix,
                 ),
-                "sender": message.from_user,
+                "sender": message.from_user.value,
                 "text": message.text,
             })
             previous_unix = message.date_unixtime
@@ -489,8 +489,8 @@ class CommandHandler:
     @classmethod
     def _get_time_display(
             cls,
-            current_unix: int,
-            previous_unix: Optional[int],
+            current_unix: DateUnixtime,
+            previous_unix: Optional[DateUnixtime],
     ) -> str:
         base_str = cls._format_timestamp(current_unix)
 
@@ -504,15 +504,15 @@ class CommandHandler:
         return f"{base_str} | {delta_str}"
 
     @staticmethod
-    def _format_timestamp(unix_time: int) -> str:
-        return datetime.datetime.fromtimestamp(unix_time).strftime("%Y-%m-%d %H:%M:%S")
+    def _format_timestamp(unix_time: DateUnixtime) -> str:
+        return datetime.datetime.fromtimestamp(unix_time.value).strftime("%Y-%m-%d %H:%M:%S")
 
     @staticmethod
     def _calculate_time_delta(
-            current_unix: int,
-            previous_unix: int,
+            current_unix: DateUnixtime,
+            previous_unix: DateUnixtime,
     ) -> str:
-        delta_seconds = current_unix - previous_unix
+        delta_seconds = current_unix.value - previous_unix.value
         if delta_seconds <= 0:
             return "+0s"
         if delta_seconds < 60:

@@ -34,3 +34,12 @@ class ID(ValueObject):
 
     def __hash__(self) -> int:
         return hash(self.value)
+
+
+class DateUnixtime(ValueObject):
+    value: int
+
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(other, DateUnixtime)
+
+        return self.value == other.value
