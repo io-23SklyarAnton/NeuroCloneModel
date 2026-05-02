@@ -58,32 +58,56 @@ class CommandHandler:
         chat: Chat = await self._get_chat_by_id(command.chat_id)
 
         for offset in range(0, chat.n_messages, constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
-            messages: list[Message] = await self._get_batch_of_messages(
+            await self._process_batch(
                 chat_id=command.chat_id,
                 offset=offset,
-                limit=constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
-            )
-            messages_sub: list[Message] = await self._get_batch_of_messages(
-                chat_id=command.chat_id,
-                offset=offset + 1,
-                limit=constants.W_SUB + constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
             )
 
-            for i, message in enumerate(messages, 1):
-                determined_thread: Optional[Thread] = await self._determine_message_thread(
-                    i,
-                    message,
-                    messages_sub,
-                    command.chat_id,
-                )
+    async def _process_batch(
+            self,
+            chat_id: Chat.ExternalID,
+            offset: int,
+    ) -> None:
+        messages: list[Message] = await self._get_batch_of_messages(
+            chat_id=chat_id,
+            offset=offset,
+            limit=constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+        )
+        messages_sub: list[Message] = await self._get_batch_of_messages(
+            chat_id=chat_id,
+            offset=offset + 1,
+            limit=constants.W_SUB + constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+        )
 
-                if determined_thread is not None:
-                    determined_thread.add_message(message)
-                    if determined_thread.needs_summary_update():
-                        new_summary = await self._generate_thread_summary(determined_thread)
-                        determined_thread.update_summary(new_summary)
+        for i, message in enumerate(messages, 1):
+            await self._process_single_message(
+                i=i,
+                message=message,
+                messages_sub=messages_sub,
+                chat_id=chat_id,
+            )
 
-                self._remove_outdated_threads(message.sequence_number)
+    async def _process_single_message(
+            self,
+            i: int,
+            message: Message,
+            messages_sub: list[Message],
+            chat_id: Chat.ExternalID,
+    ) -> None:
+        determined_thread: Optional[Thread] = await self._determine_message_thread(
+            i=i,
+            message=message,
+            messages_sub=messages_sub,
+            chat_id=chat_id,
+        )
+
+        if determined_thread is not None:
+            determined_thread.add_message(message)
+            if determined_thread.needs_summary_update():
+                new_summary = await self._generate_thread_summary(determined_thread)
+                determined_thread.update_summary(new_summary)
+
+        self._remove_outdated_threads(message.sequence_number)
 
     async def _determine_message_thread(
             self,
@@ -91,7 +115,7 @@ class CommandHandler:
             message: Message,
             messages_sub: list[Message],
             chat_id: Chat.ExternalID,
-    ):
+    ) -> Optional[Thread]:
         if message.has_reply_message_id():
             thread: Optional[Thread] = await self._determine_replied_message_thread(
                 message=message,
@@ -111,7 +135,9 @@ class CommandHandler:
             message: Message,
             chat_id: Chat.ExternalID,
     ) -> Optional[Thread]:
-        thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_external_id(message.external_id)
+        thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_external_id(
+            message_external_id=message.external_id,
+        )
         if thread is None:
             thread = await self._get_thread_by_message_external_id_and_chat_id(
                 message_external_id=message.external_id,
@@ -119,7 +145,7 @@ class CommandHandler:
             )
 
             if thread is None:
-                return
+                return None
 
             self._add_thread_to_active(thread)
 
@@ -130,16 +156,31 @@ class CommandHandler:
             i: int,
             message: Message,
             messages_sub: list[Message],
-    ):
+    ) -> Thread:
         clipped_messages_sub: list[Message] = self._clip_messages_sub(
-            messages_sub,
-            i
+            messages_sub=messages_sub,
+            i=i,
         )
-        warning_message: str = ""
+        thread_mapping: dict[int, ID] = self._generate_thread_mapping()
 
-        thread_mapping: dict[int, ID] = {
-            idx: thread_id for idx, thread_id in enumerate(self._active_threads.keys(), 1)
-        }
+        decision: "CommandHandler.ThreadDecision" = await self._get_thread_decision_with_retries(
+            message=message,
+            clipped_messages_sub=clipped_messages_sub,
+            thread_mapping=thread_mapping,
+        )
+
+        return self._apply_thread_decision(
+            decision=decision,
+            message=message,
+        )
+
+    async def _get_thread_decision_with_retries(
+            self,
+            message: Message,
+            clipped_messages_sub: list[Message],
+            thread_mapping: dict[int, ID],
+    ) -> "CommandHandler.ThreadDecision":
+        warning_message: str = ""
 
         for _ in range(constants.N_ATTEMPTS):
             prompt: str = self._get_prompt(
@@ -154,25 +195,36 @@ class CommandHandler:
                 raw_thread_decision=raw_thread_decision,
                 thread_mapping=thread_mapping,
             )
+
             if parsed_thread_decision.error_message is not None:
                 warning_message += f"{parsed_thread_decision.error_message}\n"
                 continue
 
-            if parsed_thread_decision.thread_decision.is_new_thread:
-                new_thread: Thread = self._create_thread(message)
-                self._add_thread_to_active(new_thread)
-                return new_thread
-            else:
-                return self._get_thread_from_active_threads_by_id(
-                    parsed_thread_decision.thread_decision.thread_id
-                )
+            return parsed_thread_decision.thread_decision
 
-        print("Warning: Failed to parse thread decision after multiple attempts. Assigning to new thread by default.")
-        new_thread: Thread = self._create_thread(message)
-        self._add_thread_to_active(new_thread)
-        return new_thread
+        return self.ThreadDecision(
+            thread_id=None,
+            is_new_thread=True,
+        )
 
-    async def _get_chat_by_id(self, chat_id: Chat.ExternalID) -> Chat:
+    def _apply_thread_decision(
+            self,
+            decision: "CommandHandler.ThreadDecision",
+            message: Message,
+    ) -> Thread:
+        if decision.is_new_thread:
+            new_thread: Thread = self._create_thread(message)
+            self._add_thread_to_active(new_thread)
+            return new_thread
+
+        return self._get_thread_from_active_threads_by_id(
+            thread_id=decision.thread_id,
+        )
+
+    async def _get_chat_by_id(
+            self,
+            chat_id: Chat.ExternalID,
+    ) -> Chat:
         return await self._uow.chat.get_by_id_or_raise(chat_id)
 
     async def _get_batch_of_messages(
@@ -197,7 +249,10 @@ class CommandHandler:
             chat_id=chat_id,
         )
 
-    def _add_thread_to_active(self, thread: Thread) -> None:
+    def _add_thread_to_active(
+            self,
+            thread: Thread,
+    ) -> None:
         self._active_threads[thread.id] = thread
 
     def _clip_messages_sub(
@@ -209,24 +264,32 @@ class CommandHandler:
         end_idx = start_idx + constants.W_SUB
         return messages_sub[start_idx:end_idx]
 
+    def _generate_thread_mapping(self) -> dict[int, ID]:
+        return {
+            idx: thread_id for idx, thread_id in enumerate(self._active_threads.keys(), 1)
+        }
+
     def _get_prompt(
             self,
             message: Message,
             clipped_messages_sub: list[Message],
             warning_message: Optional[str],
-            thread_mapping: dict[int, ID]
+            thread_mapping: dict[int, ID],
     ) -> str:
         return self._template.render(
             active_threads=self._format_active_threads(thread_mapping),
             target_message=self._format_target_message(message),
             future_messages=self._format_future_messages(
                 messages_sub=clipped_messages_sub,
-                start_unix=message.date_unixtime
+                start_unix=message.date_unixtime,
             ),
             warning_message=warning_message,
         )
 
-    async def _get_decision(self, prompt: str) -> str:
+    async def _get_decision(
+            self,
+            prompt: str,
+    ) -> str:
         return await self._inference_engine.generate_async(
             prompt=prompt,
             lora_path=None,
@@ -237,16 +300,16 @@ class CommandHandler:
     def _parse_thread_decision(
             self,
             raw_thread_decision: str,
-            thread_mapping: dict[int, ID]
+            thread_mapping: dict[int, ID],
     ) -> "CommandHandler.ParsedThreadDecision":
-        cleaned_output = raw_thread_decision.strip().strip('.')
+        short_id: Optional[int] = self._extract_short_id(
+            raw_thread_decision=raw_thread_decision,
+        )
 
-        try:
-            short_id = int(cleaned_output)
-        except ValueError:
+        if short_id is None:
             return self.ParsedThreadDecision(
                 error_message=f"Invalid output format. Expected integer, got: '{raw_thread_decision}'",
-                thread_decision=None
+                thread_decision=None,
             )
 
         if short_id == 0:
@@ -254,36 +317,56 @@ class CommandHandler:
                 error_message=None,
                 thread_decision=self.ThreadDecision(
                     thread_id=None,
-                    is_new_thread=True
-                )
+                    is_new_thread=True,
+                ),
             )
 
         real_id: Optional[ID] = thread_mapping.get(short_id)
         if real_id is None:
             return self.ParsedThreadDecision(
                 error_message=f"Invalid Thread ID: {short_id}. Must be 0 or one of {list(thread_mapping.keys())}",
-                thread_decision=None
+                thread_decision=None,
             )
 
         return self.ParsedThreadDecision(
             error_message=None,
             thread_decision=self.ThreadDecision(
                 thread_id=real_id,
-                is_new_thread=False
-            )
+                is_new_thread=False,
+            ),
         )
 
-    def _format_active_threads(self, thread_mapping: dict[int, ID]) -> list[dict]:
+    def _extract_short_id(
+            self,
+            raw_thread_decision: str,
+    ) -> Optional[int]:
+        cleaned_output = raw_thread_decision.strip().strip('.')
+        try:
+            return int(cleaned_output)
+        except ValueError:
+            return None
+
+    def _format_active_threads(
+            self,
+            thread_mapping: dict[int, ID],
+    ) -> list[dict]:
         active_threads_data = []
         reverse_mapping = {v: k for k, v in thread_mapping.items()}
 
         for thread in self._active_threads.values():
             short_id = reverse_mapping[thread.id]
-            active_threads_data.append(self._format_thread(thread, short_id))
+            active_threads_data.append(self._format_thread(
+                thread=thread,
+                short_id=short_id,
+            ))
 
         return active_threads_data
 
-    def _format_thread(self, thread: Thread, short_id: int) -> dict:
+    def _format_thread(
+            self,
+            thread: Thread,
+            short_id: int,
+    ) -> dict:
         recent_messages = thread.recent_messages[-constants.N_LAST_MESSAGES_IN_THREAD:]
         last_timestamp = self._format_timestamp(recent_messages[-1].date_unixtime)
 
@@ -291,10 +374,13 @@ class CommandHandler:
             "id": short_id,
             "summary": thread.summary,
             "last_timestamp": last_timestamp,
-            "messages": self._format_thread_messages(recent_messages)
+            "messages": self._format_thread_messages(messages=recent_messages),
         }
 
-    def _format_thread_messages(self, messages: list[Message]) -> list[dict]:
+    def _format_thread_messages(
+            self,
+            messages: list[Message],
+    ) -> list[dict]:
         thread_messages_data = []
         previous_unix = None
 
@@ -302,26 +388,29 @@ class CommandHandler:
             thread_messages_data.append({
                 "time_display": self._get_time_display(
                     current_unix=message.date_unixtime,
-                    previous_unix=previous_unix
+                    previous_unix=previous_unix,
                 ),
                 "sender": message.from_user,
-                "text": message.text
+                "text": message.text,
             })
             previous_unix = message.date_unixtime
 
         return thread_messages_data
 
-    def _format_target_message(self, message: Message) -> dict:
+    def _format_target_message(
+            self,
+            message: Message,
+    ) -> dict:
         return {
             "time_display": self._format_timestamp(message.date_unixtime),
             "sender": message.from_user,
-            "text": message.text
+            "text": message.text,
         }
 
     def _format_future_messages(
             self,
             messages_sub: list[Message],
-            start_unix: int
+            start_unix: int,
     ) -> list[dict]:
         future_messages_data = []
         previous_unix = start_unix
@@ -329,15 +418,19 @@ class CommandHandler:
             future_messages_data.append({
                 "time_display": self._get_time_display(
                     current_unix=message.date_unixtime,
-                    previous_unix=previous_unix
+                    previous_unix=previous_unix,
                 ),
                 "sender": message.from_user,
-                "text": message.text
+                "text": message.text,
             })
             previous_unix = message.date_unixtime
+
         return future_messages_data
 
-    def _create_thread(self, message: Message) -> Thread:
+    def _create_thread(
+            self,
+            message: Message,
+    ) -> Thread:
         return Thread.create(message=message)
 
     def _get_thread_from_active_threads_by_id(
@@ -369,32 +462,45 @@ class CommandHandler:
             self,
             current_seq_num: Message.SequenceNumber,
     ) -> None:
+        self._remove_stale_threads(current_seq_num)
+        self._enforce_active_threads_limit()
+
+    def _remove_stale_threads(
+            self,
+            current_seq_num: Message.SequenceNumber,
+    ) -> None:
         for thread in list(self._active_threads.values()):
             last_message_seq_num: Message.SequenceNumber = thread.recent_messages[-1].sequence_number
             if current_seq_num.value - last_message_seq_num.value >= constants.W_PREV:
                 del self._active_threads[thread.id]
 
-        if len(self._active_threads) > constants.N_ACTIVE_THREADS:
-            sorted_threads = sorted(
-                self._active_threads.values(),
-                key=lambda t: t.recent_messages[-1].sequence_number.value,
-                reverse=True
-            )
-            for thread in sorted_threads[constants.N_ACTIVE_THREADS:]:
-                del self._active_threads[thread.id]
+    def _enforce_active_threads_limit(self) -> None:
+        if len(self._active_threads) <= constants.N_ACTIVE_THREADS:
+            return
+
+        sorted_threads = sorted(
+            self._active_threads.values(),
+            key=lambda t: t.recent_messages[-1].sequence_number.value,
+            reverse=True,
+        )
+        for thread in sorted_threads[constants.N_ACTIVE_THREADS:]:
+            del self._active_threads[thread.id]
 
     @classmethod
     def _get_time_display(
             cls,
             current_unix: int,
-            previous_unix: Optional[int]
+            previous_unix: Optional[int],
     ) -> str:
         base_str = cls._format_timestamp(current_unix)
 
         if previous_unix is None:
             return base_str
 
-        delta_str = cls._calculate_time_delta(current_unix, previous_unix)
+        delta_str = cls._calculate_time_delta(
+            current_unix=current_unix,
+            previous_unix=previous_unix,
+        )
         return f"{base_str} | {delta_str}"
 
     @staticmethod
