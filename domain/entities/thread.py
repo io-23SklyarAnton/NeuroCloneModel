@@ -1,11 +1,14 @@
 __all__ = ["Thread"]
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import constants
 from domain.entities.base import Aggregate
 from domain.entities.message import Message
 from domain.value_objects import ID, ValueObject
+
+if TYPE_CHECKING:
+    from domain.entities.chat import Chat
 
 
 class Thread(Aggregate):
@@ -20,12 +23,14 @@ class Thread(Aggregate):
     def __init__(
             self,
             id_: ID,
+            chat_id: "Chat.ExternalID",
             summary: Optional[Summary],
             last_summary_seq_num: Message.SequenceNumber,
             recent_messages: list[Message]
     ):
         super().__init__()
         self._id = id_
+        self._chat_id = chat_id
         self._summary = summary
         self._last_summary_seq_num = last_summary_seq_num
         self._recent_messages = recent_messages
@@ -35,6 +40,10 @@ class Thread(Aggregate):
     @property
     def id(self) -> ID:
         return self._id
+
+    @property
+    def chat_id(self) -> "Chat.ExternalID":
+        return self._chat_id
 
     @property
     def summary(self) -> Optional[Summary]:
@@ -59,6 +68,7 @@ class Thread(Aggregate):
     ) -> "Thread":
         return cls(
             id_=ID.create(),
+            chat_id=message.chat_id,
             summary=None,
             last_summary_seq_num=message.sequence_number,
             recent_messages=[message],

@@ -1,9 +1,12 @@
 __all__ = ["Message"]
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from domain.entities.base import Aggregate
 from domain.value_objects import ID, ValueObject, DateUnixtime
+
+if TYPE_CHECKING:
+    from domain.entities.chat import Chat
 
 
 class Message(Aggregate):
@@ -48,6 +51,8 @@ class Message(Aggregate):
             date_unixtime: DateUnixtime,
             from_user: UserName,
             text: Text,
+            chat_id: "Chat.ExternalID",
+            thread_id: Optional[ID],
     ):
         super().__init__()
         self._id = id_
@@ -57,6 +62,8 @@ class Message(Aggregate):
         self._date_unixtime = date_unixtime
         self._from_user = from_user
         self._text = text
+        self._chat_id = chat_id
+        self._thread_id = thread_id
 
     @property
     def id(self) -> ID:
@@ -85,6 +92,14 @@ class Message(Aggregate):
     @property
     def text(self) -> Text:
         return self._text
+
+    @property
+    def chat_id(self) -> "Chat.ExternalID":
+        return self._chat_id
+
+    @property
+    def thread_id(self) -> Optional[ID]:
+        return self._thread_id
 
     def has_reply_message_id(self):
         return self._reply_to_message_id is not None
