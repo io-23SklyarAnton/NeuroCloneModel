@@ -1,15 +1,15 @@
 import abc
 
 from domain.entities.chat import Chat
-from domain.entities.message import Message
 from features.interfaces.repositories import IBaseRepository
 
 
-class IThreadRepository(IBaseRepository):
+class IMessageRepository(IBaseRepository):
     @abc.abstractmethod
-    def get_by_message_external_id_and_chat_id(
+    def get_by_chat_id_with_offset_and_limit(
             self,
-            message_external_id: Message.ExternalID,
             chat_id: Chat.ExternalID,
+            offset: int,
+            limit: int
     ):
         pass

@@ -9,7 +9,9 @@ from features.interfaces import repositories
 
 
 class IUnitOfWork(abc.ABC):
+    chat: repositories.IChatRepository
     thread: repositories.IThreadRepository
+    message: repositories.IMessageRepository
 
     def __enter__(self) -> Self:
         raise NotImplementedError
