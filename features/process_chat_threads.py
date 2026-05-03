@@ -186,6 +186,10 @@ class CommandHandler:
             message: Message,
             messages_sub: list[Message],
     ) -> Thread:
+        fast_track_thread: Optional[Thread] = self._try_fast_track_quick_reply(message)
+        if fast_track_thread is not None:
+            return fast_track_thread
+
         clipped_messages_sub: list[Message] = self._clip_messages_sub(
             messages_sub=messages_sub,
             i=i,
@@ -202,6 +206,31 @@ class CommandHandler:
             decision=decision,
             message=message,
         )
+
+    def _try_fast_track_quick_reply(
+            self,
+            message: Message,
+    ) -> Optional[Thread]:
+        if not self._active_threads:
+            return None
+
+        words = message.text.strip().split()
+        if len(words) > constants.MAX_WORDS_QUICK_REPLY:
+            return None
+
+        most_recent_thread = max(
+            self._active_threads.values(),
+            key=lambda t: t.recent_messages[-1].date_unixtime.value
+        )
+
+        last_message_time = most_recent_thread.recent_messages[-1].date_unixtime.value
+        current_message_time = message.date_unixtime.value
+
+        time_delta = current_message_time - last_message_time
+        if time_delta <= constants.MAX_SECONDS_QUICK_REPLY:
+            return most_recent_thread
+
+        return None
 
     async def _get_thread_decision_with_retries(
             self,
