@@ -1,6 +1,6 @@
 from domain.entities.chat import Chat
 from features.interfaces.repositories.i_chat import IChatRepository
-from infrastructure.in_memory.base import InMemoryBaseRepository
+from infrastructure.in_memory.repositories.base import InMemoryBaseRepository
 
 
 class InMemoryChatRepository(InMemoryBaseRepository[Chat], IChatRepository):

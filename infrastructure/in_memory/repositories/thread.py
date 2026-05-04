@@ -1,11 +1,11 @@
-from typing import Optional, Any
+from typing import Optional
 
 from domain.entities.chat import Chat
 from domain.entities.message import Message
 from domain.entities.thread import Thread
 from domain.value_objects import ID
 from features.interfaces.repositories.i_thread import IThreadRepository
-from infrastructure.in_memory.base import InMemoryBaseRepository
+from infrastructure.in_memory.repositories.base import InMemoryBaseRepository
 
 
 class InMemoryThreadRepository(InMemoryBaseRepository[Thread], IThreadRepository):

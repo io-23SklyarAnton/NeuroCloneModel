@@ -2,7 +2,7 @@ from domain.entities.chat import Chat
 from domain.entities.message import Message
 from domain.value_objects import ID
 from features.interfaces.repositories.i_message import IMessageRepository
-from infrastructure.in_memory.base import InMemoryBaseRepository
+from infrastructure.in_memory.repositories.base import InMemoryBaseRepository
 
 
 class InMemoryMessageRepository(InMemoryBaseRepository[Message], IMessageRepository):
