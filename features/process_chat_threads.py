@@ -31,6 +31,8 @@ class CommandHandler:
             else:
                 assert self.thread_id is not None
 
+            return self
+
     class ParsedThreadDecision(pydantic.BaseModel):
         error_message: Optional[str]
         thread_decision: Optional["CommandHandler.ThreadDecision"]
@@ -42,6 +44,8 @@ class CommandHandler:
             else:
                 assert self.thread_decision is not None
 
+            return self
+
     def __init__(
             self,
             uow: interfaces.IUnitOfWork,
@@ -51,9 +55,15 @@ class CommandHandler:
         self._inference_engine = inference_engine
         self._active_threads: dict[ID, Thread] = {}
 
-        self._jinja_env = jinja2.Environment(autoescape=False)
-        self._disentanglement_template = self._jinja_env.from_string(constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE)
-        self._thread_summary_template = self._jinja_env.from_string(constants.THREAD_SUMMARY_TEMPLATE)
+        template_loader = jinja2.FileSystemLoader(searchpath=".")
+        self._jinja_env = jinja2.Environment(loader=template_loader, autoescape=False)
+
+        self._disentanglement_template = self._jinja_env.get_template(
+            constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE
+        )
+        self._thread_summary_template = self._jinja_env.get_template(
+            constants.THREAD_SUMMARY_TEMPLATE
+        )
 
     async def handle(self, command: Command) -> None:
         chat: Chat = await self._get_chat_by_id(command.chat_id)
@@ -151,7 +161,8 @@ class CommandHandler:
         )
 
         raw_summary: str = await self._inference_engine.generate_async(
-            prompt=prompt,
+            system_prompt=constants.THREAD_SUMMARY_SYSTEM_PROMPT,
+            user_prompt=prompt,
             lora_path=None,
             max_tokens=constants.MAX_TOKENS_THREAD_SUMMARY,
             temp=constants.TEMP_THREAD_SUMMARY,
@@ -214,7 +225,7 @@ class CommandHandler:
         if not self._active_threads:
             return None
 
-        words = message.text.strip().split()
+        words = message.text.value.strip().split()
         if len(words) > constants.MAX_WORDS_QUICK_REPLY:
             return None
 
@@ -228,6 +239,7 @@ class CommandHandler:
 
         time_delta = current_message_time - last_message_time
         if time_delta <= constants.MAX_SECONDS_QUICK_REPLY:
+            print(f"Fast-track quick reply: associating message '{message.text.value}' with thread {most_recent_thread.id.value}")
             return most_recent_thread
 
         return None
@@ -255,9 +267,11 @@ class CommandHandler:
             )
 
             if parsed_thread_decision.error_message is not None:
+                print(f"Attempt to parse thread decision failed: {parsed_thread_decision.error_message}. Retrying...")
                 warning_message += f"{parsed_thread_decision.error_message}\n"
                 continue
 
+            print(f"Successfully parsed thread decision: {parsed_thread_decision.thread_decision}")
             return parsed_thread_decision.thread_decision
 
         return self.ThreadDecision(
@@ -349,10 +363,12 @@ class CommandHandler:
             prompt: str,
     ) -> str:
         return await self._inference_engine.generate_async(
-            prompt=prompt,
+            system_prompt=constants.DIALOGUE_DISENTANGLEMENT_SYSTEM_PROMPT,
+            user_prompt=prompt,
             lora_path=None,
             max_tokens=constants.MAX_TOKENS_THREAD_DECISION,
             temp=constants.TEMP_THREAD_DECISION,
+            assistant_prefill="number:"
         )
 
     def _parse_thread_decision(
@@ -430,7 +446,7 @@ class CommandHandler:
 
         return {
             "id": short_id,
-            "summary": thread.summary.value,
+            "summary": getattr(thread.summary, 'value', None),
             "last_timestamp": last_timestamp,
             "messages": self._format_thread_messages(messages=recent_messages),
         }

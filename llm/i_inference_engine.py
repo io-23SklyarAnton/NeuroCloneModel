@@ -15,9 +15,11 @@ class IInferenceEngine(ABC):
     @abstractmethod
     async def generate_async(
             self,
-            prompt: str,
+            system_prompt: str,
+            user_prompt: str,
             lora_path: Optional[str],
             max_tokens: int,
             temp: float,
+            assistant_prefill: str = "",
     ) -> str:
         pass

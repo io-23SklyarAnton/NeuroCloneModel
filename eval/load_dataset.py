@@ -1,17 +1,27 @@
 import json
+import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
 
 from domain.entities.chat import Chat
 from domain.entities.message import Message
-from domain.value_objects import ID, DateUnixtime
+from domain.value_objects import DateUnixtime
 from infrastructure.in_memory.uow import InMemoryUnitOfWork
 
 
+@dataclass
+class EvalDataset:
+    uow: InMemoryUnitOfWork
+    ground_truth: dict[int, str]
+
+
+SLACK_MENTION_PATTERN = re.compile(r'<@[^|]+\|([^>]+)>')
+
+
 def load_irc_dataset_to_memory(
-        json_filepath: Union[str, Path],
+        json_filepath: Path,
         uow: InMemoryUnitOfWork,
-) -> InMemoryUnitOfWork:
+) -> EvalDataset:
     with open(json_filepath, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
@@ -19,6 +29,7 @@ def load_irc_dataset_to_memory(
     for user_data in data.get("members", []):
         user_mapping[user_data["id"]] = user_data["name"]
 
+    ground_truth: dict[int, str] = {}
     chat_counter = 1
     msg_counter = 1
 
@@ -33,9 +44,7 @@ def load_irc_dataset_to_memory(
             n_messages=len(messages_data),
         )
 
-        uow.chat.create(
-            aggregate=chat,
-        )
+        uow.chat.create(chat)
 
         sorted_messages = sorted(
             messages_data,
@@ -48,20 +57,37 @@ def load_irc_dataset_to_memory(
             msg_ext_id = Message.ExternalID(value=msg_counter)
             msg_counter += 1
 
-            message = Message(
-                id_=ID.create(),
+            raw_text = msg_data["content"]
+            clean_text = SLACK_MENTION_PATTERN.sub(r'@\1', raw_text)
+
+            message = Message.create(
                 external_id=msg_ext_id,
                 reply_to_message_id=None,
                 sequence_number=Message.SequenceNumber(value=seq_num),
                 date_unixtime=DateUnixtime(value=int(msg_data["timestamp"])),
                 from_user=Message.UserName(value=author_name),
-                text=Message.Text(value=msg_data["content"]),
+                text=Message.Text(value=clean_text),
                 chat_id=chat_ext_id,
                 thread_id=None,
             )
 
-            setattr(message, "expected_thread_id", msg_data["conversation"])
+            ground_truth[msg_ext_id.value] = msg_data["conversation"]
 
             uow.message.create(message)
 
-    return uow
+    return EvalDataset(
+        uow=uow,
+        ground_truth=ground_truth,
+    )
+
+
+if __name__ == "__main__":
+    uow = InMemoryUnitOfWork()
+
+    current_dir = Path(__file__).parent
+    dataset_path = current_dir / "CODI" / "validation.json"
+
+    load_irc_dataset_to_memory(
+        json_filepath=dataset_path,
+        uow=uow,
+    )

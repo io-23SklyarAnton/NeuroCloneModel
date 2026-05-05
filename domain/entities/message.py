@@ -103,3 +103,27 @@ class Message(Aggregate):
 
     def has_reply_message_id(self):
         return self._reply_to_message_id is not None
+
+    @classmethod
+    def create(
+            cls,
+            external_id: ExternalID,
+            reply_to_message_id: Optional[ID],
+            sequence_number: SequenceNumber,
+            date_unixtime: DateUnixtime,
+            from_user: UserName,
+            text: Text,
+            chat_id: "Chat.ExternalID",
+            thread_id: Optional[ID],
+    ):
+        return cls(
+            id_=ID.create(),
+            external_id=external_id,
+            reply_to_message_id=reply_to_message_id,
+            sequence_number=sequence_number,
+            date_unixtime=date_unixtime,
+            from_user=from_user,
+            text=text,
+            chat_id=chat_id,
+            thread_id=thread_id,
+        )

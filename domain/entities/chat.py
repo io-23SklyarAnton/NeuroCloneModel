@@ -13,6 +13,9 @@ class Chat(Aggregate):
 
             return self.value == other.value
 
+        def __hash__(self):
+            return hash(self.value)
+
     def __init__(
             self,
             external_id: ExternalID,

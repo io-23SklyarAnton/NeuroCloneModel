@@ -42,6 +42,8 @@ idna==3.11
 jinja2==3.1.6
     # via mlx-lm
     # via neuroclonemodel
+joblib==1.5.3
+    # via scikit-learn
 markdown-it-py==4.0.0
     # via rich
 markupsafe==3.0.3
@@ -56,6 +58,8 @@ mlx-metal==0.31.1
     # via mlx
 numpy==2.4.4
     # via mlx-lm
+    # via scikit-learn
+    # via scipy
     # via transformers
 packaging==26.1
     # via huggingface-hub
@@ -78,10 +82,17 @@ rich==15.0.0
     # via typer
 safetensors==0.7.0
     # via transformers
+scikit-learn==1.8.0
+    # via neuroclonemodel
+scipy==1.17.1
+    # via neuroclonemodel
+    # via scikit-learn
 sentencepiece==0.2.1
     # via mlx-lm
 shellingham==1.5.4
     # via typer
+threadpoolctl==3.6.0
+    # via scikit-learn
 tokenizers==0.22.2
     # via transformers
 tqdm==4.67.3
