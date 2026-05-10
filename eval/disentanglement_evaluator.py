@@ -8,12 +8,27 @@ from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score, m
 
 
 class DisentanglementEvaluator:
-    def __init__(self, ground_truth: dict[int, Any], predictions: dict[int, Any]):
-        self.message_ids = sorted(list(ground_truth.keys()))
-        self.total_messages = len(self.message_ids)
+    def __init__(self, ground_truth: dict[Any, Any], predictions: dict[Any, Any]):
+        self.gt_normalized = {str(k): v for k, v in ground_truth.items()}
+        self.pred_normalized = {str(k): v for k, v in predictions.items()}
 
-        self.y_true = [ground_truth[mid] for mid in self.message_ids]
-        self.y_pred = [predictions.get(mid) or f"UNASSIGNED_{mid}" for mid in self.message_ids]
+        try:
+            self.message_ids = sorted(list(self.gt_normalized.keys()), key=int)
+        except ValueError:
+            self.message_ids = sorted(list(self.gt_normalized.keys()))
+
+        self.total_messages = len(self.message_ids)
+        self.y_true = []
+        self.y_pred = []
+
+        for mid in self.message_ids:
+            self.y_true.append(self.gt_normalized[mid])
+
+            p_id = self.pred_normalized.get(mid)
+            if p_id is None:
+                p_id = f"UNASSIGNED_{mid}"
+
+            self.y_pred.append(p_id)
 
         self.true_clusters = defaultdict(set)
         self.pred_clusters = defaultdict(set)

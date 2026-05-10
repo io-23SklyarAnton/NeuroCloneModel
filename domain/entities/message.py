@@ -127,3 +127,12 @@ class Message(Aggregate):
             chat_id=chat_id,
             thread_id=thread_id,
         )
+
+    def assign_to_thread(
+            self,
+            thread_id: ID
+    ) -> None:
+        if self._thread_id is not None:
+            raise ValueError(f"Message {self._id} already belongs to thread {self._thread_id}")
+
+        self._thread_id = thread_id

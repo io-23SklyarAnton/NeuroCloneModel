@@ -1,26 +1,39 @@
 import enum
 
-W_PREV = 40
+W_PREV = 60
 W_SUB = 10
 W_AGG = 10
 MAX_TOKENS_THREAD_DECISION = 3
 TEMP_THREAD_DECISION = 0.0
 MAX_TOKENS_THREAD_SUMMARY = 100
 TEMP_THREAD_SUMMARY = 0.1
-N_ACTIVE_THREADS = 3
+N_ACTIVE_THREADS = 5
 N_ATTEMPTS = 5
-N_LAST_MESSAGES_IN_THREAD = 5
+N_LAST_MESSAGES_IN_THREAD = 15
 N_LAST_MESSAGES_FOR_SUMMARY = 5
 N_RECENT_MESSAGES = 20
 BATCH_SIZE_DIALOGUE_DISENTANGLEMENT = 20
-MAX_WORDS_QUICK_REPLY = 3
-MAX_SECONDS_QUICK_REPLY = 60 * 60
+MAX_WORDS_QUICK_REPLY = 2
+MAX_SECONDS_QUICK_REPLY = 60
 DIALOGUE_DISENTANGLEMENT_TEMPLATE = 'llm/prompts/thread_decision.jinja2'
 THREAD_SUMMARY_TEMPLATE = 'llm/prompts/thread_summary.jinja2'
 
 
 class AvailableModel(enum.StrEnum):
     QWEN_3_5_9B = "QWEN_3_5_9B"
+    QWEN_3_5_4B = "QWEN_3_5_4B"
+    QWEN_2_5_3B = "QWEN_2_5_3B"
+    QWEN_2_5_1_5B = "QWEN_2_5_1_5B"
+    LLAMA_3_2_3B = "LLAMA_3_2_3B"
+
+    def is_qwen(self) -> bool:
+        return self.value in {
+            AvailableModel.QWEN_3_5_9B.value,
+            AvailableModel.QWEN_3_5_4B.value,
+            AvailableModel.QWEN_2_5_3B.value,
+            AvailableModel.QWEN_2_5_1_5B.value,
+        }
+
 
 DIALOGUE_DISENTANGLEMENT_SYSTEM_PROMPT = """You are an expert dialogue disentanglement AI. Your task is to route a target message to the correct existing conversation thread.
 

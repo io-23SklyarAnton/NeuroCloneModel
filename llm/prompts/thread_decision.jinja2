@@ -1,18 +1,13 @@
 {% for thread in active_threads %}
 <Thread ID="{{ thread.id }}">
-{% if thread.summary %}Summary: {{ thread.summary }}
-{% endif %}
 Recent Messages:
 {% for msg in thread.messages %}
 - [{{ msg.time_display }}] {{ msg.sender }}: {{ msg.text }}
 {% endfor %}
 </Thread>
-
 {% endfor %}
-
 Target Message:
 [{{ target_message.time_display }}] {{ target_message.sender }}: {{ target_message.text }}
-
 Future Context:
 {% if future_messages %}
 {% for msg in future_messages %}
@@ -21,7 +16,6 @@ Future Context:
 {% else %}
 No future messages available.
 {% endif %}
-
 {% if warning_message %}
 ### SYSTEM WARNING FROM PREVIOUS ATTEMPT
 {{ warning_message }}

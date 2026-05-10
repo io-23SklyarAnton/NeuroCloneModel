@@ -1,4 +1,6 @@
 import datetime
+import re
+import time
 from typing import Optional
 import pydantic
 from typing_extensions import Self
@@ -55,14 +57,14 @@ class CommandHandler:
         self._inference_engine = inference_engine
         self._active_threads: dict[ID, Thread] = {}
 
+        self._total_classification_time: float = 0.0
+        self._processed_messages_count: int = 0
+
         template_loader = jinja2.FileSystemLoader(searchpath=".")
         self._jinja_env = jinja2.Environment(loader=template_loader, autoescape=False)
 
         self._disentanglement_template = self._jinja_env.get_template(
             constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE
-        )
-        self._thread_summary_template = self._jinja_env.get_template(
-            constants.THREAD_SUMMARY_TEMPLATE
         )
 
     async def handle(self, command: Command) -> None:
@@ -73,6 +75,11 @@ class CommandHandler:
                 chat_id=command.chat_id,
                 offset=offset,
             )
+
+        if self._processed_messages_count > 0:
+            avg_time = self._total_classification_time / self._processed_messages_count
+            print(f"Processed messages: {self._processed_messages_count}")
+            print(f"avg classification time: {avg_time:.4f} seconds")
 
     async def _process_batch(
             self,
@@ -105,6 +112,7 @@ class CommandHandler:
             messages_sub: list[Message],
             chat_id: Chat.ExternalID,
     ) -> None:
+        start_time = time.perf_counter()
         determined_thread: Optional[Thread] = await self._determine_message_thread(
             i=i,
             message=message,
@@ -114,11 +122,17 @@ class CommandHandler:
 
         if determined_thread is not None:
             determined_thread.add_message(message)
-            if determined_thread.needs_summary_update():
-                new_summary = await self._generate_thread_summary(determined_thread)
-                determined_thread.update_summary(new_summary)
+            message.assign_to_thread(determined_thread.id)
 
         self._remove_outdated_threads(message.sequence_number)
+
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
+
+        self._total_classification_time += elapsed_time
+        self._processed_messages_count += 1
+
+        print(f"Message Sequence {message.sequence_number.value} | Classification time: {elapsed_time:.4f} seconds")
 
     async def _determine_message_thread(
             self,
@@ -140,35 +154,6 @@ class CommandHandler:
             message=message,
             messages_sub=messages_sub,
         )
-
-    async def _generate_thread_summary(
-            self,
-            thread: Thread,
-    ) -> Thread.Summary:
-        recent_messages = thread.recent_messages[-constants.N_LAST_MESSAGES_FOR_SUMMARY:]
-
-        messages_data = [
-            {
-                "sender": message.from_user.value,
-                "text": message.text.value,
-            }
-            for message in recent_messages
-        ]
-
-        prompt: str = self._thread_summary_template.render(
-            previous_summary=getattr(thread.summary.value, 'value', None),
-            messages=messages_data,
-        )
-
-        raw_summary: str = await self._inference_engine.generate_async(
-            system_prompt=constants.THREAD_SUMMARY_SYSTEM_PROMPT,
-            user_prompt=prompt,
-            lora_path=None,
-            max_tokens=constants.MAX_TOKENS_THREAD_SUMMARY,
-            temp=constants.TEMP_THREAD_SUMMARY,
-        )
-
-        return Thread.Summary(value=raw_summary.strip())
 
     async def _determine_replied_message_thread(
             self,
@@ -223,9 +208,11 @@ class CommandHandler:
             message: Message,
     ) -> Optional[Thread]:
         if not self._active_threads:
-            return None
+            new_thread: Thread = self._create_thread_and_add_to_active(message)
+            return new_thread
 
-        words = message.text.value.strip().split()
+        words = re.findall(r'\w+', message.text.value)
+
         if len(words) > constants.MAX_WORDS_QUICK_REPLY:
             return None
 
@@ -239,7 +226,7 @@ class CommandHandler:
 
         time_delta = current_message_time - last_message_time
         if time_delta <= constants.MAX_SECONDS_QUICK_REPLY:
-            print(f"Fast-track quick reply: associating message '{message.text.value}' with thread {most_recent_thread.id.value}")
+            print(f"Fast-track quick reply:'{message.text.value}' to thread {most_recent_thread.id.value}")
             return most_recent_thread
 
         return None
@@ -285,8 +272,7 @@ class CommandHandler:
             message: Message,
     ) -> Thread:
         if decision.is_new_thread:
-            new_thread: Thread = self._create_thread(message)
-            self._add_thread_to_active(new_thread)
+            new_thread: Thread = self._create_thread_and_add_to_active(message)
             return new_thread
 
         return self._get_thread_from_active_threads_by_id(
@@ -414,9 +400,13 @@ class CommandHandler:
             self,
             raw_thread_decision: str,
     ) -> Optional[int]:
-        cleaned_output = raw_thread_decision.strip().strip('.')
+        match = re.search(r'\d+', raw_thread_decision)
+
+        if not match:
+            return None
+
         try:
-            return int(cleaned_output)
+            return int(match.group())
         except ValueError:
             return None
 
@@ -446,7 +436,6 @@ class CommandHandler:
 
         return {
             "id": short_id,
-            "summary": getattr(thread.summary, 'value', None),
             "last_timestamp": last_timestamp,
             "messages": self._format_thread_messages(messages=recent_messages),
         }
@@ -501,11 +490,14 @@ class CommandHandler:
 
         return future_messages_data
 
-    def _create_thread(
+    def _create_thread_and_add_to_active(
             self,
             message: Message,
     ) -> Thread:
-        return Thread.create(message=message)
+        new_thread = Thread.create(message=message)
+        self._add_thread_to_active(new_thread)
+
+        return new_thread
 
     def _get_thread_from_active_threads_by_id(
             self,
