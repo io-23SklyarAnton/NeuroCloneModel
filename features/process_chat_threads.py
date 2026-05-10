@@ -60,11 +60,11 @@ class CommandHandler:
         self._total_classification_time: float = 0.0
         self._processed_messages_count: int = 0
 
-        template_loader = jinja2.FileSystemLoader(searchpath=".")
+        template_loader = jinja2.FileSystemLoader(str(constants.PROMPTS_DIR))
         self._jinja_env = jinja2.Environment(loader=template_loader, autoescape=False)
 
         self._disentanglement_template = self._jinja_env.get_template(
-            constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE
+            constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE_NAME
         )
 
     async def handle(self, command: Command) -> None:

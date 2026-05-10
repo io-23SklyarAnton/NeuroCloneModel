@@ -1,7 +1,10 @@
 import enum
 import pathlib
 
-BASE_PATH = pathlib.Path(__file__).parent
+BASE_PATH = pathlib.Path(__file__).resolve().parent
+
+PROMPTS_DIR = BASE_PATH / 'llm' / 'prompts'
+DIALOGUE_DISENTANGLEMENT_TEMPLATE_NAME = 'thread_decision.jinja2'
 
 W_PREV = 60
 W_SUB = 10
@@ -18,7 +21,6 @@ N_RECENT_MESSAGES = 20
 BATCH_SIZE_DIALOGUE_DISENTANGLEMENT = 20
 MAX_WORDS_QUICK_REPLY = 2
 MAX_SECONDS_QUICK_REPLY = 60
-DIALOGUE_DISENTANGLEMENT_TEMPLATE = BASE_PATH / 'llm' / 'prompts' / 'dialogue_disentanglement.jinja2'
 
 
 class AvailableModel(enum.StrEnum):
