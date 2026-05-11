@@ -9,3 +9,4 @@ wheels/
 data
 # venv
 .venv
+*/cache
