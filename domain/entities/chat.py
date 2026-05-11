@@ -36,3 +36,14 @@ class Chat(Aggregate):
     @property
     def n_messages(self) -> int:
         return self._n_messages
+
+    @classmethod
+    def create(
+            cls,
+            external_id: ExternalID,
+            n_messages: int
+    ) -> "Chat":
+        return cls(
+            external_id=external_id,
+            n_messages=n_messages
+        )

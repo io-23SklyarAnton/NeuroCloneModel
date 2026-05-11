@@ -114,7 +114,6 @@ class Message(Aggregate):
             from_user: UserName,
             text: Text,
             chat_id: "Chat.ExternalID",
-            thread_id: Optional[ID],
     ):
         return cls(
             id_=ID.create(),
@@ -125,7 +124,7 @@ class Message(Aggregate):
             from_user=from_user,
             text=text,
             chat_id=chat_id,
-            thread_id=thread_id,
+            thread_id=None,
         )
 
     def assign_to_thread(
