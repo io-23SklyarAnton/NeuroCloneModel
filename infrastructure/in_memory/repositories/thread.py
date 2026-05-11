@@ -33,3 +33,15 @@ class InMemoryThreadRepository(InMemoryBaseRepository[Thread], IThreadRepository
             return None
 
         return self.get_or_raise(id_=target_thread_id)
+
+    async def get_all_by_chat_id(
+            self,
+            chat_id: Chat.ExternalID,
+    ) -> list[Thread]:
+        chat_threads: list[Thread] = []
+
+        for thread in self._storage.values():
+            if thread.chat_id == chat_id:
+                chat_threads.append(thread)
+
+        return chat_threads

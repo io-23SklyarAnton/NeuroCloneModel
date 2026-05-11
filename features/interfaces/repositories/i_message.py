@@ -1,6 +1,8 @@
 import abc
 
 from domain.entities.chat import Chat
+from domain.entities.message import Message
+from domain.value_objects import ID
 from features.interfaces.repositories import IBaseRepository
 
 
@@ -12,4 +14,11 @@ class IMessageRepository(IBaseRepository):
             offset: int,
             limit: int
     ):
+        pass
+
+    @abc.abstractmethod
+    async def get_by_thread_id(
+            self,
+            thread_id: ID,
+    ) -> list[Message]:
         pass

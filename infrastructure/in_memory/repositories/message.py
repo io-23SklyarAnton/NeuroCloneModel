@@ -14,7 +14,7 @@ class InMemoryMessageRepository(InMemoryBaseRepository[Message], IMessageReposit
 
     async def get_by_chat_id_with_offset_and_limit(
             self,
-            chat_id: Chat.ExternalID      ,
+            chat_id: Chat.ExternalID,
             offset: int,
             limit: int,
     ) -> list[Message]:
@@ -27,3 +27,17 @@ class InMemoryMessageRepository(InMemoryBaseRepository[Message], IMessageReposit
         chat_messages.sort(key=lambda m: m.sequence_number.value)
 
         return chat_messages[offset:offset + limit]
+
+    async def get_by_thread_id(
+            self,
+            thread_id: ID,
+    ) -> list[Message]:
+        thread_messages: list[Message] = []
+
+        for message in self._storage.values():
+            if message.thread_id == thread_id:
+                thread_messages.append(message)
+
+        thread_messages.sort(key=lambda m: m.sequence_number.value)
+
+        return thread_messages
