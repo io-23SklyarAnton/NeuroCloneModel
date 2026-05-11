@@ -1,17 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-import constants
-
 
 class IInferenceEngine(ABC):
-    @abstractmethod
-    def load_base_model(
-            self,
-            base_model: constants.AvailableModel,
-    ) -> None:
-        pass
-
     @abstractmethod
     async def generate_async(
             self,
@@ -20,6 +11,15 @@ class IInferenceEngine(ABC):
             lora_path: Optional[str],
             max_tokens: int,
             temp: float,
+            priority: int,
             assistant_prefill: str = "",
     ) -> str:
+        pass
+
+    @abstractmethod
+    async def train_lora(
+            self,
+            data_dir: str,
+            adapter_path: str,
+    ) -> None:
         pass

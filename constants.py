@@ -22,6 +22,18 @@ BATCH_SIZE_DIALOGUE_DISENTANGLEMENT = 20
 MAX_WORDS_QUICK_REPLY = 2
 MAX_SECONDS_QUICK_REPLY = 60
 
+IMITATION_CONTEXT_TEMPLATE_NAME = 'imitation_context.jinja2'
+IMITATION_SYSTEM_PROMPT = "Act as {target_user}. Continue the chat history organically, preserving the exact language, typing style, and persona of {target_user}."
+MAX_TOKENS_IMITATION = 150
+TEMP_IMITATION = 0.7
+MAX_CONTEXT_MESSAGES_IMITATION = 15
+
+LORA_ITERS = 3
+LORA_BATCH_SIZE = 1
+LORA_LAYERS = 16
+LORA_LR = 2e-5
+LORA_MAX_SEQ_LENGTH = 512
+
 
 class AvailableModel(enum.StrEnum):
     QWEN_3_5_9B = "QWEN_3_5_9B"
