@@ -1,7 +1,6 @@
 import json
+from dataclasses import dataclass
 from typing import Optional
-
-import pydantic
 
 from domain.entities.chat import Chat
 from domain.entities.message import Message
@@ -19,7 +18,8 @@ class Command(ICommand):
 
 
 class CommandHandler:
-    class ParsedExport(pydantic.BaseModel):
+    @dataclass
+    class ParsedExport:
         chat: Chat
         messages: list[Message]
 

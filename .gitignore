@@ -10,3 +10,5 @@ data
 # venv
 .venv
 */cache
+/eval/tests
+/eval/adapters

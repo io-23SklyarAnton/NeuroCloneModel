@@ -1,17 +1,16 @@
 import abc
 
 from domain.entities.chat import Chat
-from domain.entities.message import Message
 from domain.entities.thread import Thread
+from domain.value_objects import ID
 from features.interfaces.repositories import IBaseRepository
 
 
 class IThreadRepository(IBaseRepository):
     @abc.abstractmethod
-    def get_by_message_external_id_and_chat_id(
+    def get_by_message_id(
             self,
-            message_external_id: Message.ExternalID,
-            chat_id: Chat.ExternalID,
+            message_id: ID,
     ):
         pass
 

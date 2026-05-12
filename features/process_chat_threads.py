@@ -102,7 +102,6 @@ class CommandHandler:
                 i=i,
                 message=message,
                 messages_sub=messages_sub,
-                chat_id=chat_id,
             )
 
     async def _process_single_message(
@@ -110,14 +109,12 @@ class CommandHandler:
             i: int,
             message: Message,
             messages_sub: list[Message],
-            chat_id: Chat.ExternalID,
     ) -> None:
         start_time = time.perf_counter()
         determined_thread: Optional[Thread] = await self._determine_message_thread(
             i=i,
             message=message,
             messages_sub=messages_sub,
-            chat_id=chat_id,
         )
 
         if determined_thread is not None:
@@ -139,14 +136,11 @@ class CommandHandler:
             i: int,
             message: Message,
             messages_sub: list[Message],
-            chat_id: Chat.ExternalID,
     ) -> Optional[Thread]:
         if message.has_reply_message_id():
-            thread: Optional[Thread] = await self._determine_replied_message_thread(
-                message=message,
-                chat_id=chat_id,
-            )
+            thread: Optional[Thread] = await self._determine_replied_message_thread(message)
             if thread is not None:
+                print(f"Message {message.external_id.value} assigned to thread {thread.id.value} based on reply_to_message_id {message.reply_to_message_id}")
                 return thread
 
         return await self._determine_non_replied_message_thread(
@@ -158,16 +152,10 @@ class CommandHandler:
     async def _determine_replied_message_thread(
             self,
             message: Message,
-            chat_id: Chat.ExternalID,
     ) -> Optional[Thread]:
-        thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_external_id(
-            message_external_id=message.external_id,
-        )
+        thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_id(message.reply_to_message_id)
         if thread is None:
-            thread = await self._get_thread_by_message_external_id_and_chat_id(
-                message_external_id=message.external_id,
-                chat_id=chat_id,
-            )
+            thread = await self._uow.thread.get_by_message_id(message.reply_to_message_id)
 
             if thread is None:
                 return None
@@ -297,16 +285,6 @@ class CommandHandler:
             limit=limit,
         )
 
-    async def _get_thread_by_message_external_id_and_chat_id(
-            self,
-            message_external_id: Message.ExternalID,
-            chat_id: Chat.ExternalID,
-    ) -> Optional[Thread]:
-        return await self._uow.thread.get_by_message_external_id_and_chat_id(
-            message_external_id=message_external_id,
-            chat_id=chat_id,
-        )
-
     def _add_thread_to_active(
             self,
             thread: Thread,
@@ -354,7 +332,8 @@ class CommandHandler:
             lora_path=None,
             max_tokens=constants.MAX_TOKENS_THREAD_DECISION,
             temp=constants.TEMP_THREAD_DECISION,
-            assistant_prefill="number:"
+            assistant_prefill="number:",
+            priority=10,
         )
 
     def _parse_thread_decision(
@@ -495,6 +474,7 @@ class CommandHandler:
             message: Message,
     ) -> Thread:
         new_thread = Thread.create(message=message)
+        self._uow.thread.create(new_thread)
         self._add_thread_to_active(new_thread)
 
         return new_thread
@@ -509,17 +489,17 @@ class CommandHandler:
 
         raise ValueError(f"Thread with id {thread_id} not found in active threads")
 
-    def _get_thread_from_active_threads_by_message_external_id(
+    def _get_thread_from_active_threads_by_message_id(
             self,
-            message_external_id: Message.ExternalID,
+            message_id: ID,
     ) -> Optional[Thread]:
         for thread in self._active_threads.values():
             for message in thread.recent_messages:
-                if message.external_id == message_external_id:
+                if message.id == message_id:
                     return thread
 
             for message in thread.uncommitted_messages:
-                if message.external_id == message_external_id:
+                if message.id == message_id:
                     return thread
 
         return None

@@ -17,15 +17,14 @@ class InMemoryThreadRepository(InMemoryBaseRepository[Thread], IThreadRepository
         super().__init__(storage)
         self._messages_storage = messages_storage
 
-    async def get_by_message_external_id_and_chat_id(
+    async def get_by_message_id(
             self,
-            message_external_id: Message.ExternalID,
-            chat_id: Chat.ExternalID,
+            message_id: Message.ExternalID,
     ) -> Optional[Thread]:
         target_thread_id: Optional[ID] = None
 
         for message in self._messages_storage.values():
-            if message.external_id == message_external_id and message.chat_id == chat_id:
+            if message.id == message_id:
                 target_thread_id = message.thread_id
                 break
 
