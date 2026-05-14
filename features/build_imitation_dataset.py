@@ -80,7 +80,11 @@ class CommandHandler:
         pairs: list[CommandHandler.ImitationPair] = []
         context: list[Message] = []
         for message in messages:
-            if message.from_user == target_user and context:
+            if self._is_target_response(
+                    message=message,
+                    target_user=target_user,
+                    context=context,
+            ):
                 pairs.append(self._build_pair(
                     context=context,
                     response=message
@@ -89,6 +93,18 @@ class CommandHandler:
             context.append(message)
 
         return pairs
+
+    def _is_target_response(
+            self,
+            message: Message,
+            target_user: Message.UserName,
+            context: list[Message],
+    ) -> bool:
+        return (
+                message.from_user == target_user
+                and message.message_type == Message.Type.REGULAR
+                and context
+        )
 
     def _build_pair(
             self,
@@ -101,7 +117,8 @@ class CommandHandler:
         )
 
     def _format_context(self, messages: list[Message]) -> str:
-        window = messages[-constants.MAX_CONTEXT_MESSAGES_IMITATION:] # TODO: make it depend on the token count, not messages count
+        window = messages[
+                 -constants.MAX_CONTEXT_MESSAGES_IMITATION:]  # TODO: make it depend on the token count, not messages count
         messages_data = [
             {
                 "sender": msg.from_user.value,

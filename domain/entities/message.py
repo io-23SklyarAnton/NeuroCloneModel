@@ -1,5 +1,6 @@
 __all__ = ["Message"]
 
+from enum import StrEnum
 from typing import Optional, TYPE_CHECKING
 
 from domain.entities.base import Aggregate
@@ -10,6 +11,10 @@ if TYPE_CHECKING:
 
 
 class Message(Aggregate):
+    class Type(StrEnum):
+        REGULAR = "regular"
+        SERVICE = "service"
+
     class ExternalID(ValueObject):
         value: int
 
@@ -53,6 +58,7 @@ class Message(Aggregate):
             text: Text,
             chat_id: "Chat.ExternalID",
             thread_id: Optional[ID],
+            message_type: Type,
     ):
         super().__init__()
         self._id = id_
@@ -64,6 +70,7 @@ class Message(Aggregate):
         self._text = text
         self._chat_id = chat_id
         self._thread_id = thread_id
+        self._message_type = message_type
 
     @property
     def id(self) -> ID:
@@ -101,6 +108,10 @@ class Message(Aggregate):
     def thread_id(self) -> Optional[ID]:
         return self._thread_id
 
+    @property
+    def message_type(self) -> Type:
+        return self._message_type
+
     def has_reply_message_id(self):
         return self._reply_to_message_id is not None
 
@@ -114,6 +125,7 @@ class Message(Aggregate):
             from_user: UserName,
             text: Text,
             chat_id: "Chat.ExternalID",
+            message_type: Type,
     ):
         return cls(
             id_=ID.create(),
@@ -125,6 +137,7 @@ class Message(Aggregate):
             text=text,
             chat_id=chat_id,
             thread_id=None,
+            message_type=message_type,
         )
 
     def assign_to_thread(

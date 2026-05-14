@@ -104,8 +104,10 @@ class CommandHandler:
         raw_type = raw.get("type")
         if raw_type == "message":
             from_user = raw.get("from")
+            message_type = Message.Type.REGULAR
         elif raw_type == "service":
             from_user = raw.get("actor")
+            message_type = Message.Type.SERVICE
         else:
             return None
 
@@ -124,6 +126,7 @@ class CommandHandler:
             from_user=Message.UserName(value=from_user),
             text=Message.Text(value=text),
             chat_id=chat_id,
+            message_type=message_type,
         )
 
     @staticmethod
