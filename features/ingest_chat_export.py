@@ -1,3 +1,4 @@
+import asyncio
 import json
 from dataclasses import dataclass
 from typing import Optional
@@ -18,6 +19,14 @@ class Command(ICommand):
 
 
 class CommandHandler:
+    _MEDIA_TYPE_PREFIXES: dict[str, str] = {
+        "video_file": "[VIDEO]",
+        "voice_message": "[VOICE]",
+        "video_message": "[VIDEO_MESSAGE]",
+        "animation": "[GIF]",
+        "audio_file": "[AUDIO]",
+    }
+
     @dataclass
     class ParsedExport:
         chat: Chat
@@ -92,12 +101,18 @@ class CommandHandler:
             chat_id: Chat.ExternalID,
             external_id_map: _ExternalIdMap,
     ) -> Optional[Message]:
-        if raw.get("type") != "message":
-            return None
-        if not raw.get("from"):
+        raw_type = raw.get("type")
+        if raw_type == "message":
+            from_user = raw.get("from")
+        elif raw_type == "service":
+            from_user = raw.get("actor")
+        else:
             return None
 
-        text = self._extract_text(raw.get("text", ""))
+        if not from_user:
+            return None
+
+        text = self._build_text(raw)
         if not text:
             return None
 
@@ -106,7 +121,7 @@ class CommandHandler:
             reply_to_message_id=self._resolve_reply(raw, external_id_map),
             sequence_number=Message.SequenceNumber(value=sequence_number),
             date_unixtime=DateUnixtime(value=int(raw["date_unixtime"])),
-            from_user=Message.UserName(value=raw["from"]),
+            from_user=Message.UserName(value=from_user),
             text=Message.Text(value=text),
             chat_id=chat_id,
         )
@@ -125,6 +140,55 @@ class CommandHandler:
 
         return external_id_map.get(reply_external_id)
 
+    def _build_text(
+            self,
+            raw: dict,
+    ) -> str:
+        if raw.get("type") == "service":
+            return self._build_service_text(raw)
+
+        caption: str = self._extract_text(raw.get("text", ""))
+        prefix: Optional[str] = self._extract_content_prefix(raw)
+
+        if prefix and caption:
+            return f"{prefix} {caption}"
+        if prefix:
+            return prefix
+
+        return caption
+
+    @staticmethod
+    def _build_service_text(raw: dict) -> str:
+        action = raw.get("action")
+        if not action:
+            return ""
+
+        return f"[SERVICE {action}]"
+
+    def _extract_content_prefix(
+            self,
+            raw: dict
+    ) -> Optional[str]:
+        if raw.get("photo"):
+            return "[IMAGE]"
+
+        media_type = raw.get("media_type")
+        if media_type == "sticker":
+            emoji = raw.get("sticker_emoji")
+            return f"[STICKER {emoji}]" if emoji else "[STICKER]"
+        if media_type:
+            mapped = self._MEDIA_TYPE_PREFIXES.get(media_type)
+            return mapped if mapped else f"[{media_type.upper()}]"
+
+        if raw.get("file"):
+            return "[FILE]"
+        if raw.get("location_information"):
+            return "[LOCATION]"
+        if raw.get("poll"):
+            return "[POLL]"
+
+        return None
+
     @staticmethod
     def _extract_text(raw_text: str | list) -> str:
         if isinstance(raw_text, str):
@@ -142,3 +206,25 @@ class CommandHandler:
         self._uow.chat.create(parsed_export.chat)
         for message in parsed_export.messages:
             self._uow.message.create(message)
+
+
+if __name__ == "__main__":
+    from infrastructure.in_memory.uow import InMemoryUnitOfWork
+    from infrastructure.local import LocalStorage
+    from pathlib import Path
+
+    _BASE_DIR = Path(__file__).parent.parent
+    uow = InMemoryUnitOfWork()
+    storage = LocalStorage(
+        base_path=_BASE_DIR / "eval" / "data"
+    )
+
+    ingest_handler = CommandHandler(
+        uow=uow,
+        storage=storage,
+    )
+    command = Command(
+        bucket_name=str(_BASE_DIR / "data"),
+        file_name="example_extended.json",
+    )
+    asyncio.run(ingest_handler.handle(command))
