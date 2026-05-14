@@ -34,6 +34,12 @@ BatchSpec = tuple[np.ndarray, np.ndarray, np.ndarray]
 BucketPlan = dict[int, list[BatchSpec]]
 
 
+@dataclasses.dataclass
+class _TrainExample:
+    tokens: list[int]
+    prefix_len: int
+
+
 class MLXInferenceEngine(IInferenceEngine):
     @dataclasses.dataclass(order=True)
     class _GenerationRequest:
@@ -45,7 +51,7 @@ class MLXInferenceEngine(IInferenceEngine):
     _LORA_PARAMETERS: dict[str, Any] = {
         "rank": 8,
         "alpha": 16.0,
-        "scale": 10.0,
+        "scale": 2.0,
         "dropout": 0.0,
     }
     _BUCKET_CANDIDATES: list[int] = [128, 256, 512, 1024, 2048, 4096]
@@ -608,22 +614,22 @@ class MLXInferenceEngine(IInferenceEngine):
             self,
             data_dir: Path,
     ) -> BucketPlan:
-        all_tokens: list[list[int]] = self._load_train_token_sequences(data_dir)
-        if not all_tokens:
+        all_examples: list[_TrainExample] = self._load_train_examples(data_dir)
+        if not all_examples:
             return {}
 
         pad_id: int = self._get_pad_token_id()
         bucket_sizes: list[int] = self._compute_bucket_sizes(constants.LORA_MAX_SEQ_LENGTH)
-        bucketed: dict[int, list[list[int]]] = self._assign_to_buckets(
-            all_tokens=all_tokens,
+        bucketed: dict[int, list[_TrainExample]] = self._assign_to_buckets(
+            all_examples=all_examples,
             bucket_sizes=bucket_sizes,
         )
 
         result: BucketPlan = {}
-        for bucket_size, tokens_list in bucketed.items():
+        for bucket_size, examples in bucketed.items():
             batches: list[BatchSpec] = self._build_batches_for_bucket(
                 bucket_size=bucket_size,
-                tokens_list=tokens_list,
+                examples=examples,
                 pad_id=pad_id,
             )
             if batches:
@@ -631,38 +637,52 @@ class MLXInferenceEngine(IInferenceEngine):
 
         return result
 
-    def _load_train_token_sequences(
+    def _load_train_examples(
             self,
             data_dir: Path,
-    ) -> list[list[int]]:
+    ) -> list[_TrainExample]:
         train_file: Path = data_dir / self._TRAIN_FILENAME
         with open(train_file, "r", encoding="utf-8") as f:
             lines: list[str] = f.readlines()
 
         max_seq: int = constants.LORA_MAX_SEQ_LENGTH
-        sequences: list[list[int]] = []
+        examples: list[_TrainExample] = []
         for line in lines:
-            tokens: list[int] = self._tokenize_train_entry(line, max_seq)
-            if len(tokens) >= 2:
-                sequences.append(tokens)
+            example: Optional[_TrainExample] = self._tokenize_train_entry(line, max_seq)
+            if example is not None:
+                examples.append(example)
 
-        return sequences
+        return examples
 
     def _tokenize_train_entry(
             self,
             jsonl_line: str,
             max_seq: int,
-    ) -> list[int]:
+    ) -> Optional[_TrainExample]:
         data: dict[str, Any] = json.loads(jsonl_line)
-        text: str = self._tokenizer.apply_chat_template(
-            data["messages"],
+        messages: list[dict[str, str]] = data["messages"]
+
+        prompt_text: str = self._tokenizer.apply_chat_template(
+            messages[:-1],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        prompt_tokens: list[int] = self._tokenizer.encode(prompt_text)
+        prefix_len: int = len(prompt_tokens)
+
+        full_text: str = self._tokenizer.apply_chat_template(
+            messages,
             tokenize=False,
             add_generation_prompt=False,
         )
-        tokens: list[int] = self._tokenizer.encode(text)
-        if len(tokens) > max_seq:
-            tokens = tokens[:max_seq]
-        return tokens
+        full_tokens: list[int] = self._tokenizer.encode(full_text)
+        if len(full_tokens) > max_seq:
+            full_tokens = full_tokens[:max_seq]
+
+        if prefix_len >= len(full_tokens) or len(full_tokens) < 2:
+            return None
+
+        return _TrainExample(tokens=full_tokens, prefix_len=prefix_len)
 
     def _get_pad_token_id(self) -> int:
         pad_id: Optional[int] = getattr(self._tokenizer, "pad_token_id", None)
@@ -683,39 +703,44 @@ class MLXInferenceEngine(IInferenceEngine):
 
     @staticmethod
     def _assign_to_buckets(
-            all_tokens: list[list[int]],
+            all_examples: list[_TrainExample],
             bucket_sizes: list[int],
-    ) -> dict[int, list[list[int]]]:
-        bucketed: dict[int, list[list[int]]] = {b: [] for b in bucket_sizes}
+    ) -> dict[int, list[_TrainExample]]:
+        bucketed: dict[int, list[_TrainExample]] = {b: [] for b in bucket_sizes}
         largest_bucket: int = bucket_sizes[-1]
-        for tokens in all_tokens:
+        for example in all_examples:
             placed: bool = False
             for bucket_size in bucket_sizes:
-                if len(tokens) <= bucket_size:
-                    bucketed[bucket_size].append(tokens)
+                if len(example.tokens) <= bucket_size:
+                    bucketed[bucket_size].append(example)
                     placed = True
                     break
             if not placed:
-                bucketed[largest_bucket].append(tokens[:largest_bucket])
+                truncated_tokens: list[int] = example.tokens[:largest_bucket]
+                if example.prefix_len >= len(truncated_tokens):
+                    continue
+                bucketed[largest_bucket].append(
+                    _TrainExample(tokens=truncated_tokens, prefix_len=example.prefix_len)
+                )
         return bucketed
 
     def _build_batches_for_bucket(
             self,
             bucket_size: int,
-            tokens_list: list[list[int]],
+            examples: list[_TrainExample],
             pad_id: int,
     ) -> list[BatchSpec]:
-        if not tokens_list:
+        if not examples:
             return []
 
         batch_size: int = constants.LORA_BATCH_SIZE
         batches: list[BatchSpec] = []
-        for i in range(0, len(tokens_list), batch_size):
-            batch_tokens: list[list[int]] = tokens_list[i:i + batch_size]
-            if len(batch_tokens) < batch_size:
+        for i in range(0, len(examples), batch_size):
+            batch_examples: list[_TrainExample] = examples[i:i + batch_size]
+            if len(batch_examples) < batch_size:
                 continue
             batches.append(self._build_single_batch(
-                batch_tokens=batch_tokens,
+                batch_examples=batch_examples,
                 bucket_size=bucket_size,
                 pad_id=pad_id,
             ))
@@ -724,7 +749,7 @@ class MLXInferenceEngine(IInferenceEngine):
     @classmethod
     def _build_single_batch(
             cls,
-            batch_tokens: list[list[int]],
+            batch_examples: list[_TrainExample],
             bucket_size: int,
             pad_id: int,
     ) -> BatchSpec:
@@ -733,9 +758,9 @@ class MLXInferenceEngine(IInferenceEngine):
         batch_targets: list[list[int]] = []
         batch_mask: list[list[float]] = []
 
-        for tokens in batch_tokens:
+        for example in batch_examples:
             inputs, targets, mask = cls._build_single_example(
-                tokens=tokens,
+                example=example,
                 bucket_size=bucket_size,
                 seq_len=seq_len,
                 pad_id=pad_id,
@@ -752,11 +777,12 @@ class MLXInferenceEngine(IInferenceEngine):
 
     @staticmethod
     def _build_single_example(
-            tokens: list[int],
+            example: _TrainExample,
             bucket_size: int,
             seq_len: int,
             pad_id: int,
     ) -> tuple[list[int], list[int], list[float]]:
+        tokens: list[int] = example.tokens
         seq: list[int] = list(tokens[:bucket_size])
         pad_needed: int = bucket_size - len(seq)
         if pad_needed > 0:
@@ -765,8 +791,10 @@ class MLXInferenceEngine(IInferenceEngine):
         inputs: list[int] = seq[:-1]
         targets: list[int] = seq[1:]
 
-        real_target_count: int = max(0, min(len(tokens), bucket_size) - 1)
-        mask: list[float] = (
-            [1.0] * real_target_count + [0.0] * (seq_len - real_target_count)
-        )
+        response_start: int = max(0, example.prefix_len - 1)
+        response_end: int = max(0, min(len(tokens), bucket_size) - 1)
+
+        mask: list[float] = [0.0] * seq_len
+        for i in range(response_start, response_end):
+            mask[i] = 1.0
         return inputs, targets, mask
