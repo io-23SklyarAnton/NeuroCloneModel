@@ -23,6 +23,9 @@ class ID(ValueObject):
         return cls(value=uuid.uuid4())
 
     def __eq__(self, other: object) -> bool:
+        if other is None:
+            return False
+
         assert isinstance(other, ID)
 
         return self.value == other.value

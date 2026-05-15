@@ -55,6 +55,7 @@ class MLXInferenceEngine(IInferenceEngine):
         "dropout": 0.0,
     }
     _BUCKET_CANDIDATES: list[int] = [128, 256, 512, 1024, 2048, 4096]
+    _SNAPSHOT_EVERY_N_BATCHES: int = 1
 
     def __init__(
             self,
@@ -70,6 +71,7 @@ class MLXInferenceEngine(IInferenceEngine):
         self._worker_task: Optional[asyncio.Task] = None
         self._gpu_lock: asyncio.Lock = asyncio.Lock()
         self._is_training: bool = False
+        self._active_training_adapter_path: Optional[str] = None
 
         self._load_base_model(base_model)
 
@@ -105,16 +107,34 @@ class MLXInferenceEngine(IInferenceEngine):
 
         self._ensure_worker_started()
         self._is_training = True
+        self._active_training_adapter_path = adapter_path
 
         try:
             async with self._gpu_lock:
-                await asyncio.to_thread(
-                    self._sync_train_lora,
+                setup_result: Optional[tuple[StepFn, BucketPlan]] = await asyncio.to_thread(
+                    self._setup_training,
                     train_data_path,
-                    adapter_path,
                 )
+
+            if setup_result is None:
+                print("No training batches available.")
+                return
+
+            step_fn, bucket_plan = setup_result
+            await self._run_training_with_yielding(
+                bucket_plan=bucket_plan,
+                step_fn=step_fn,
+                adapter_path=adapter_path,
+            )
+
+            async with self._gpu_lock:
+                await asyncio.to_thread(self._save_adapters, adapter_path)
+            self._active_lora_path = adapter_path
         finally:
-            self._is_training = False
+            async with self._gpu_lock:
+                await asyncio.to_thread(self._cleanup_after_training)
+                self._is_training = False
+                self._active_training_adapter_path = None
             self._invalidate_frozen_cache()
 
     def _load_base_model(
@@ -209,26 +229,38 @@ class MLXInferenceEngine(IInferenceEngine):
             temp: float,
             assistant_prefill: str,
     ) -> str:
-        self._switch_lora_if_needed(lora_path)
+        snapshot: Optional[dict[str, mx.array]] = None
+        if self._is_training:
+            if lora_path != self._active_training_adapter_path:
+                snapshot = self._snapshot_training_lora_weights()
+                self._apply_adapter_for_inference(lora_path)
+            self._invalidate_frozen_cache()
+        else:
+            self._switch_lora_if_needed(lora_path)
 
-        sys_tokens: list[int] = self._tokenize_system_prompt(system_prompt)
-        prompt_cache: list[Any] = self._get_frozen_cache(system_prompt, sys_tokens)
-        delta_tokens: list[int] = self._build_delta_tokens(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            assistant_prefill=assistant_prefill,
-            sys_tokens_count=len(sys_tokens),
-        )
+        try:
+            sys_tokens: list[int] = self._tokenize_system_prompt(system_prompt)
+            prompt_cache: list[Any] = self._get_frozen_cache(system_prompt, sys_tokens)
+            delta_tokens: list[int] = self._build_delta_tokens(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                assistant_prefill=assistant_prefill,
+                sys_tokens_count=len(sys_tokens),
+            )
 
-        return generate(
-            self._model,
-            self._tokenizer,
-            prompt=delta_tokens,
-            prompt_cache=prompt_cache,
-            max_tokens=max_tokens,
-            sampler=make_sampler(temp=temp),
-            verbose=False,
-        )
+            return generate(
+                self._model,
+                self._tokenizer,
+                prompt=delta_tokens,
+                prompt_cache=prompt_cache,
+                max_tokens=max_tokens,
+                sampler=make_sampler(temp=temp),
+                verbose=False,
+            )
+        finally:
+            if snapshot is not None:
+                self._restore_training_lora_weights(snapshot)
+                self._invalidate_frozen_cache()
 
     def _switch_lora_if_needed(
             self,
@@ -258,6 +290,49 @@ class MLXInferenceEngine(IInferenceEngine):
         self._model.load_weights(list(weights.items()), strict=False)
         mx.eval(self._model.parameters())
         self._model.eval()
+
+    def _snapshot_training_lora_weights(self) -> dict[str, mx.array]:
+        flat_params: dict[str, mx.array] = dict(
+            mx_utils.tree_flatten(self._model.trainable_parameters())
+        )
+        snapshot: dict[str, mx.array] = {
+            name: mx.add(weight, 0) for name, weight in flat_params.items()
+        }
+        mx.eval(list(snapshot.values()))
+        return snapshot
+
+    def _restore_training_lora_weights(
+            self,
+            snapshot: dict[str, mx.array],
+    ) -> None:
+        self._model.load_weights(list(snapshot.items()), strict=False)
+        mx.eval(self._model.parameters())
+
+    def _apply_adapter_for_inference(
+            self,
+            lora_path: Optional[str],
+    ) -> None:
+        if lora_path is None:
+            self._zero_lora_weights()
+            return
+
+        adapter_file = Path(lora_path)
+        if not adapter_file.exists():
+            raise FileNotFoundError(f"Adapter weights not found: {adapter_file}")
+
+        weights = dict(mx.load(str(adapter_file)))
+        self._model.load_weights(list(weights.items()), strict=False)
+        mx.eval(self._model.parameters())
+
+    def _zero_lora_weights(self) -> None:
+        flat_params: dict[str, mx.array] = dict(
+            mx_utils.tree_flatten(self._model.trainable_parameters())
+        )
+        zeroed: list[tuple[str, mx.array]] = [
+            (name, mx.zeros_like(weight)) for name, weight in flat_params.items()
+        ]
+        self._model.load_weights(zeroed, strict=False)
+        mx.eval(self._model.parameters())
 
     def _invalidate_frozen_cache(self) -> None:
         self._frozen_system_prompt = None
@@ -313,6 +388,7 @@ class MLXInferenceEngine(IInferenceEngine):
     ) -> list[Any]:
         if not self._is_frozen_cache_valid(system_prompt):
             self._compute_and_store_frozen_cache(system_prompt, sys_tokens)
+
         return self._clone_frozen_cache()
 
     def _is_frozen_cache_valid(
@@ -349,11 +425,10 @@ class MLXInferenceEngine(IInferenceEngine):
 
         self._frozen_system_prompt = system_prompt
 
-    def _sync_train_lora(
+    def _setup_training(
             self,
             train_data_path: str,
-            adapter_path: str,
-    ) -> None:
+    ) -> Optional[tuple[StepFn, BucketPlan]]:
         self._safe_clear_cache()
         self._prepare_model_for_training()
 
@@ -361,24 +436,16 @@ class MLXInferenceEngine(IInferenceEngine):
         bucket_plan: BucketPlan = self._prepare_dataset_buckets(Path(train_data_path))
 
         if not bucket_plan:
-            print("No training batches available.")
-            self._model.eval()
-            return
+            return None
 
         self._log_bucket_summary(bucket_plan)
-
         step_fn: StepFn = self._build_step_fn(optimizer)
         self._safe_reset_peak_memory()
+        return step_fn, bucket_plan
 
-        try:
-            self._run_training_epochs(
-                bucket_plan=bucket_plan,
-                step_fn=step_fn,
-            )
-            self._save_adapters(adapter_path)
-        finally:
-            self._model.eval()
-            self._safe_clear_cache()
+    def _cleanup_after_training(self) -> None:
+        self._model.eval()
+        self._safe_clear_cache()
 
     def _prepare_model_for_training(self) -> None:
         self._model.train()
@@ -460,28 +527,31 @@ class MLXInferenceEngine(IInferenceEngine):
         ce: mx.array = nn.losses.cross_entropy(logits, targets_b, reduction="none")
         return (ce * mask_b).sum() / mx.maximum(mask_b.sum(), mx.array(1.0))
 
-    def _run_training_epochs(
+    async def _run_training_with_yielding(
             self,
             bucket_plan: BucketPlan,
             step_fn: StepFn,
+            adapter_path: str,
     ) -> None:
         total_batches: int = sum(len(specs) for specs in bucket_plan.values())
         print(f"Starting training for {constants.LORA_ITERS} epochs...")
 
         for epoch in range(constants.LORA_ITERS):
-            self._run_epoch(
+            await self._run_epoch_with_yielding(
                 epoch=epoch,
                 bucket_plan=bucket_plan,
                 step_fn=step_fn,
                 total_batches=total_batches,
+                adapter_path=adapter_path,
             )
 
-    def _run_epoch(
+    async def _run_epoch_with_yielding(
             self,
             epoch: int,
             bucket_plan: BucketPlan,
             step_fn: StepFn,
             total_batches: int,
+            adapter_path: str,
     ) -> None:
         epoch_loss: float = 0.0
         epoch_time: float = 0.0
@@ -490,7 +560,16 @@ class MLXInferenceEngine(IInferenceEngine):
         for bucket_size, batch_specs in bucket_plan.items():
             for spec in batch_specs:
                 seen += 1
-                loss_val, elapsed = self._execute_training_step(spec, step_fn)
+
+                async with self._gpu_lock:
+                    loss_val, elapsed = await asyncio.to_thread(
+                        self._execute_training_step, spec, step_fn,
+                    )
+                    self._invalidate_frozen_cache()
+                    self._safe_clear_cache()
+                    if seen % self._SNAPSHOT_EVERY_N_BATCHES == 0:
+                        await asyncio.to_thread(self._save_adapters, adapter_path)
+
                 epoch_loss += loss_val
                 epoch_time += elapsed
                 self._log_batch_progress(
@@ -501,7 +580,7 @@ class MLXInferenceEngine(IInferenceEngine):
                     loss_val=loss_val,
                     elapsed=elapsed,
                 )
-                self._safe_clear_cache()
+                await asyncio.sleep(0)
 
         self._log_epoch_summary(
             epoch=epoch,
