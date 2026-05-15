@@ -55,8 +55,6 @@ class MLXInferenceEngine(IInferenceEngine):
         "dropout": 0.0,
     }
     _BUCKET_CANDIDATES: list[int] = [128, 256, 512, 1024, 2048, 4096]
-    _ADAPTER_FILENAME: str = "adapters.safetensors"
-    _TRAIN_FILENAME: str = "train.jsonl"
 
     def __init__(
             self,
@@ -99,7 +97,7 @@ class MLXInferenceEngine(IInferenceEngine):
 
     async def train_lora(
             self,
-            data_dir: str,
+            train_data_path: str,
             adapter_path: str,
     ) -> None:
         if self._is_training:
@@ -112,7 +110,7 @@ class MLXInferenceEngine(IInferenceEngine):
             async with self._gpu_lock:
                 await asyncio.to_thread(
                     self._sync_train_lora,
-                    data_dir,
+                    train_data_path,
                     adapter_path,
                 )
         finally:
@@ -251,8 +249,7 @@ class MLXInferenceEngine(IInferenceEngine):
             self._load_base_model(self._base_model)
             return
 
-        adapter_dir = Path(lora_path)
-        adapter_file = adapter_dir / self._ADAPTER_FILENAME
+        adapter_file = Path(lora_path)
         if not adapter_file.exists():
             raise FileNotFoundError(f"Adapter weights not found: {adapter_file}")
 
@@ -354,14 +351,14 @@ class MLXInferenceEngine(IInferenceEngine):
 
     def _sync_train_lora(
             self,
-            data_dir: str,
+            train_data_path: str,
             adapter_path: str,
     ) -> None:
         self._safe_clear_cache()
         self._prepare_model_for_training()
 
         optimizer: optim.Adam = self._create_lora_optimizer()
-        bucket_plan: BucketPlan = self._prepare_dataset_buckets(Path(data_dir))
+        bucket_plan: BucketPlan = self._prepare_dataset_buckets(Path(train_data_path))
 
         if not bucket_plan:
             print("No training batches available.")
@@ -533,13 +530,13 @@ class MLXInferenceEngine(IInferenceEngine):
             self,
             adapter_path: str,
     ) -> None:
-        out_path: Path = Path(adapter_path)
-        out_path.mkdir(parents=True, exist_ok=True)
+        adapter_file: Path = Path(adapter_path)
+        adapter_file.parent.mkdir(parents=True, exist_ok=True)
         trainable_weights: dict[str, mx.array] = dict(
             mx_utils.tree_flatten(self._model.trainable_parameters())
         )
         mx.save_safetensors(
-            str(out_path / self._ADAPTER_FILENAME),
+            str(adapter_file),
             trainable_weights,
         )
         print("Training successfully completed. Adapters saved.")
@@ -612,9 +609,9 @@ class MLXInferenceEngine(IInferenceEngine):
 
     def _prepare_dataset_buckets(
             self,
-            data_dir: Path,
+            train_file: Path,
     ) -> BucketPlan:
-        all_examples: list[_TrainExample] = self._load_train_examples(data_dir)
+        all_examples: list[_TrainExample] = self._load_train_examples(train_file)
         if not all_examples:
             return {}
 
@@ -639,9 +636,8 @@ class MLXInferenceEngine(IInferenceEngine):
 
     def _load_train_examples(
             self,
-            data_dir: Path,
+            train_file: Path,
     ) -> list[_TrainExample]:
-        train_file: Path = data_dir / self._TRAIN_FILENAME
         with open(train_file, "r", encoding="utf-8") as f:
             lines: list[str] = f.readlines()
 

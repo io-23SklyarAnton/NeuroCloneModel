@@ -19,7 +19,7 @@ class IInferenceEngine(ABC):
     @abstractmethod
     async def train_lora(
             self,
-            data_dir: str,
+            train_data_path: str,
             adapter_path: str,
     ) -> None:
         pass

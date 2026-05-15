@@ -5,7 +5,7 @@ from llm import IInferenceEngine
 
 
 class Command(ICommand):
-    data_dir: Path
+    train_data_path: Path
     adapter_path: Path
 
 
@@ -14,8 +14,7 @@ class CommandHandler:
         self._inference_engine = inference_engine
 
     async def handle(self, command: Command) -> None:
-        command.adapter_path.mkdir(parents=True, exist_ok=True)
         await self._inference_engine.train_lora(
-            data_dir=str(command.data_dir),
+            train_data_path=str(command.train_data_path),
             adapter_path=str(command.adapter_path),
         )
