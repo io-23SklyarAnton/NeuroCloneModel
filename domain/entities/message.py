@@ -12,8 +12,19 @@ if TYPE_CHECKING:
 
 class Message(Aggregate):
     class Type(StrEnum):
-        REGULAR = "regular"
-        SERVICE = "service"
+        TEXT = "TEXT"
+        IMAGE = "IMAGE"
+        VIDEO_FILE = "VIDEO_FILE"
+        VOICE_MESSAGE = "VOICE_MESSAGE"
+        VIDEO_MESSAGE = "VIDEO_MESSAGE"
+        STICKER = "STICKER"
+        ANIMATION = "ANIMATION"
+        AUDIO_FILE = "AUDIO_FILE"
+        FILE = "FILE"
+        LOCATION = "LOCATION"
+        POLL = "POLL"
+        OTHER_MEDIA = "OTHER_MEDIA"
+        SERVICE = "SERVICE"
 
     class ExternalID(ValueObject):
         value: int

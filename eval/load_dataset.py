@@ -68,7 +68,7 @@ def load_irc_dataset_to_memory(
                 from_user=Message.UserName(value=author_name),
                 text=Message.Text(value=clean_text),
                 chat_id=chat_ext_id,
-                message_type=Message.Type.REGULAR,
+                message_type=Message.Type.TEXT,
             )
 
             ground_truth[msg_ext_id.value] = msg_data["conversation"]

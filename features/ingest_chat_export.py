@@ -19,12 +19,13 @@ class Command(ICommand):
 
 
 class CommandHandler:
-    _MEDIA_TYPE_PREFIXES: dict[str, str] = {
-        "video_file": "[VIDEO]",
-        "voice_message": "[VOICE]",
-        "video_message": "[VIDEO_MESSAGE]",
-        "animation": "[GIF]",
-        "audio_file": "[AUDIO]",
+    _MEDIA_TYPE_TO_TYPE: dict[str, Message.Type] = {
+        "sticker": Message.Type.STICKER,
+        "video_file": Message.Type.VIDEO_FILE,
+        "voice_message": Message.Type.VOICE_MESSAGE,
+        "video_message": Message.Type.VIDEO_MESSAGE,
+        "animation": Message.Type.ANIMATION,
+        "audio_file": Message.Type.AUDIO_FILE,
     }
 
     @dataclass
@@ -104,7 +105,7 @@ class CommandHandler:
         raw_type = raw.get("type")
         if raw_type == "message":
             from_user = raw.get("from")
-            message_type = Message.Type.REGULAR
+            message_type = self._determine_content_type(raw)
         elif raw_type == "service":
             from_user = raw.get("actor")
             message_type = Message.Type.SERVICE
@@ -114,7 +115,7 @@ class CommandHandler:
         if not from_user:
             return None
 
-        text = self._build_text(raw)
+        text = self._build_text(raw, message_type)
         if not text:
             return None
 
@@ -128,6 +129,23 @@ class CommandHandler:
             chat_id=chat_id,
             message_type=message_type,
         )
+
+    def _determine_content_type(self, raw: dict) -> Message.Type:
+        if raw.get("photo"):
+            return Message.Type.IMAGE
+
+        media_type = raw.get("media_type")
+        if media_type:
+            return self._MEDIA_TYPE_TO_TYPE.get(media_type, Message.Type.OTHER_MEDIA)
+
+        if raw.get("file"):
+            return Message.Type.FILE
+        if raw.get("location_information"):
+            return Message.Type.LOCATION
+        if raw.get("poll"):
+            return Message.Type.POLL
+
+        return Message.Type.TEXT
 
     @staticmethod
     def _resolve_reply(
@@ -146,12 +164,13 @@ class CommandHandler:
     def _build_text(
             self,
             raw: dict,
+            content_type: Message.Type,
     ) -> str:
-        if raw.get("type") == "service":
+        if content_type == Message.Type.SERVICE:
             return self._build_service_text(raw)
 
         caption: str = self._extract_text(raw.get("text", ""))
-        prefix: Optional[str] = self._extract_content_prefix(raw)
+        prefix: Optional[str] = self._build_prefix(raw, content_type)
 
         if prefix and caption:
             return f"{prefix} {caption}"
@@ -168,29 +187,23 @@ class CommandHandler:
 
         return f"[SERVICE {action}]"
 
-    def _extract_content_prefix(
+    def _build_prefix(
             self,
-            raw: dict
+            raw: dict,
+            content_type: Message.Type,
     ) -> Optional[str]:
-        if raw.get("photo"):
-            return "[IMAGE]"
+        if content_type == Message.Type.TEXT:
+            return None
 
-        media_type = raw.get("media_type")
-        if media_type == "sticker":
+        if content_type == Message.Type.STICKER:
             emoji = raw.get("sticker_emoji")
             return f"[STICKER {emoji}]" if emoji else "[STICKER]"
-        if media_type:
-            mapped = self._MEDIA_TYPE_PREFIXES.get(media_type)
-            return mapped if mapped else f"[{media_type.upper()}]"
 
-        if raw.get("file"):
-            return "[FILE]"
-        if raw.get("location_information"):
-            return "[LOCATION]"
-        if raw.get("poll"):
-            return "[POLL]"
+        if content_type == Message.Type.OTHER_MEDIA:
+            media_type = raw.get("media_type", "media")
+            return f"[{media_type.upper()}]"
 
-        return None
+        return f"[{content_type.value}]"
 
     @staticmethod
     def _extract_text(raw_text: str | list) -> str:

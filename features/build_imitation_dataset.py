@@ -102,7 +102,7 @@ class CommandHandler:
     ) -> bool:
         return (
                 message.from_user == target_user
-                and message.message_type == Message.Type.REGULAR
+                and message.message_type == Message.Type.TEXT
                 and context
         )
 
