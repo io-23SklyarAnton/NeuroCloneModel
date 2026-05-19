@@ -10,6 +10,7 @@ class InMemoryUnitOfWork(IUnitOfWork):
             messages_storage={},
             storage={},
         )
+        self.user = repositories.InMemoryUserRepository({})
 
     def __enter__(self) -> "InMemoryUnitOfWork":
         return self

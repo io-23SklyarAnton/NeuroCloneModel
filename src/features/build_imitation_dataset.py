@@ -11,6 +11,7 @@ from domain.entities.message import Message
 from features import interfaces
 from features.base import ICommand
 from features.interfaces import IStorage
+from utils import get_now_datetime
 
 
 class Command(ICommand):
@@ -150,7 +151,7 @@ class CommandHandler:
 
     @staticmethod
     def _make_file_name(chat_id: Chat.ExternalID) -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = get_now_datetime().strftime("%Y%m%d_%H%M%S")
         return f"{chat_id.value}_{timestamp}.jsonl"
 
     def _build_system_prompt(self, target_user: Message.UserName) -> str:

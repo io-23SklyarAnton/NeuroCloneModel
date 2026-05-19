@@ -12,6 +12,7 @@ dependencies = [
     "scikit-learn>=1.8.0",
     "scipy>=1.17.1",
     "aiogram>=3.28.2",
+    "dishka>=1.10.1",
 ]
 readme = "README.md"
 requires-python = ">=  3.12.7"
