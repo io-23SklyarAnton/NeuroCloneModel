@@ -1,4 +1,5 @@
 import abc
+from typing import Optional
 
 from domain.entities.chat import Chat
 from domain.entities.message import Message
@@ -21,4 +22,12 @@ class IMessageRepository(IBaseRepository):
             self,
             thread_id: ID,
     ) -> list[Message]:
+        pass
+
+    @abc.abstractmethod
+    async def get_by_chat_and_external_id_optional(
+            self,
+            chat_id: Chat.ExternalID,
+            external_id: Message.ExternalID,
+    ) -> Optional[Message]:
         pass

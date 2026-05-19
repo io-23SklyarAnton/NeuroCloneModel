@@ -1,3 +1,5 @@
+from typing import Optional
+
 from domain.entities.chat import Chat
 from features.interfaces.repositories.i_chat import IChatRepository
 from infrastructure.in_memory.repositories.base import InMemoryBaseRepository
@@ -15,3 +17,9 @@ class InMemoryChatRepository(InMemoryBaseRepository[Chat], IChatRepository):
             id_: Chat.ExternalID,
     ) -> Chat:
         return self.get_or_raise(id_)
+
+    async def get_by_id_optional(
+            self,
+            chat_id: Chat.ExternalID,
+    ) -> Optional[Chat]:
+        return self.get_optional(chat_id)

@@ -47,3 +47,6 @@ class Chat(Aggregate):
             external_id=external_id,
             n_messages=n_messages
         )
+
+    def register_new_message(self) -> None:
+        self._n_messages += 1

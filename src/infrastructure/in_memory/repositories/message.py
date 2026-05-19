@@ -1,3 +1,5 @@
+from typing import Optional
+
 from domain.entities.chat import Chat
 from domain.entities.message import Message
 from domain.value_objects import ID
@@ -41,3 +43,14 @@ class InMemoryMessageRepository(InMemoryBaseRepository[Message], IMessageReposit
         thread_messages.sort(key=lambda m: m.sequence_number.value)
 
         return thread_messages
+
+    async def get_by_chat_and_external_id_optional(
+            self,
+            chat_id: Chat.ExternalID,
+            external_id: Message.ExternalID,
+    ) -> Optional[Message]:
+        for message in self._storage.values():
+            if message.chat_id == chat_id and message.external_id == external_id:
+                return message
+
+        return None

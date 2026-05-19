@@ -9,6 +9,8 @@ wheels/
 data
 # venv
 .venv
-*/cache
-/eval/tests
-/eval/adapters
+src/eval/cache/*
+src/eval/tests
+src/eval/adapters
+src/eval/manual_tests
+.claude

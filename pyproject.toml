@@ -11,6 +11,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "scikit-learn>=1.8.0",
     "scipy>=1.17.1",
+    "aiogram>=3.28.2",
 ]
 readme = "README.md"
 requires-python = ">=  3.12.7"
