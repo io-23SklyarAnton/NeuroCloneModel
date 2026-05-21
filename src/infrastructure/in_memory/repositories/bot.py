@@ -18,9 +18,3 @@ class InMemoryBotRepository(InMemoryBaseRepository[Bot], IBotRepository):
 
     async def get_by_id_optional(self, bot_id: ID) -> Optional[Bot]:
         return self.get_optional(bot_id)
-
-    async def get_all_by_owner_id(self, owner_id: ID) -> list[Bot]:
-        return [
-            bot for bot in self._storage.values()
-            if bot.owner_id == owner_id
-        ]
