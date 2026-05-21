@@ -10,6 +10,7 @@ from domain.entities import User
 from domain.entities.bot import Bot
 from features import interfaces
 from features.base import ICommand, Response
+import constants
 
 
 class Command(ICommand):
@@ -38,6 +39,10 @@ class CommandHandler:
         bot: Optional[Bot] = await self._uow.bot.get_by_token_optional(command.bot_token)
         if bot is not None:
             return Response(message="Bot with this token already exists.")
+
+        user_bots = await self._uow.bot.get_by_owner_id(requester.id)
+        if len(user_bots) >= constants.USER_BOT_LIMIT:
+            return Response(message=f"You have reached the maximum number of bots ({constants.USER_BOT_LIMIT}).")
 
         bot = Bot.create(
             name=command.bot_name,

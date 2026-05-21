@@ -1,5 +1,6 @@
 from typing import Optional
 
+from domain.entities import User
 from domain.entities.bot import Bot
 from domain.value_objects import ID
 from features.interfaces.repositories.i_bot import IBotRepository
@@ -18,3 +19,6 @@ class InMemoryBotRepository(InMemoryBaseRepository[Bot], IBotRepository):
 
     async def get_by_id_optional(self, bot_id: ID) -> Optional[Bot]:
         return self.get_optional(bot_id)
+
+    async def get_by_owner_id(self, owner_id: User.TelegramID) -> list[Bot]:
+        return [bot for bot in self._storage.values() if bot.owner_id == owner_id]

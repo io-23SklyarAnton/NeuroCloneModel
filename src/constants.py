@@ -34,6 +34,8 @@ LORA_LAYERS = 16
 LORA_LR = 2e-5
 LORA_MAX_SEQ_LENGTH = 512
 
+USER_BOT_LIMIT = 5
+
 
 class AvailableModel(enum.StrEnum):
     QWEN_3_5_9B = "QWEN_3_5_9B"
