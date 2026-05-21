@@ -1,8 +1,8 @@
-# from features.interfaces.i_bot_runner_service import IBotRunnerService
+from features.interfaces.i_bot_runner_service import IBotRunnerService
 from features.interfaces.i_storage import IStorage
 from features.interfaces.i_unit_of_work import IUnitOfWork
 from features.interfaces.repositories import (
-    # IBotRepository,
+    IBotRepository,
     IChatRepository,
     IMessageRepository,
     IThreadRepository,
@@ -10,8 +10,8 @@ from features.interfaces.repositories import (
 )
 
 __all__ = [
-    # "IBotRepository",
-    # "IBotRunnerService",
+    "IBotRepository",
+    "IBotRunnerService",
     "IChatRepository",
     "IMessageRepository",
     "IStorage",

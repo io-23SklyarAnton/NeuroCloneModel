@@ -9,6 +9,7 @@ from features.interfaces import repositories
 
 
 class IUnitOfWork(abc.ABC):
+    bot: repositories.IBotRepository
     chat: repositories.IChatRepository
     message: repositories.IMessageRepository
     thread: repositories.IThreadRepository
