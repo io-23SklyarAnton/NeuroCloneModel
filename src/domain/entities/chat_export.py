@@ -10,6 +10,12 @@ if TYPE_CHECKING:
 
 
 class ChatExport(Aggregate):
+    class EventChatExportCreated(Aggregate.IDomainEvent):
+        class Payload(Aggregate.IDomainEvent.Payload):
+            export_file_key: ExportFileKey
+
+    payload: EventChatExportCreated.Payload
+
     def __init__(
             self,
             chat_id: "Chat.ExternalID",
@@ -50,9 +56,16 @@ class ChatExport(Aggregate):
             owner_id: "User.TelegramID",
             export_file_key: ExportFileKey,
     ) -> "ChatExport":
-        return cls(
+        chat_export = cls(
             chat_id=chat_id,
             owner_id=owner_id,
             export_file_key=export_file_key,
             is_disentangled=False,
         )
+        chat_export._events_to_publish.append(cls.EventChatExportCreated(
+            object_id=str(chat_export.id.value),
+            payload=cls.EventChatExportCreated.Payload(
+                export_file_key=export_file_key,
+            ),
+        ))
+        return chat_export

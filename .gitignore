@@ -14,3 +14,4 @@ src/eval/tests
 src/eval/adapters
 src/eval/manual_tests
 .claude
+*/.env

@@ -48,9 +48,6 @@ class Bot(Aggregate):
         ) -> None:
             super().__init__(f"User {requester_id} is not the owner of bot {bot_id}")
 
-    class EventBotCreated(Aggregate.IDomainEvent):
-        ...
-
     def __init__(
             self,
             id_: ID,
@@ -112,7 +109,6 @@ class Bot(Aggregate):
             status=cls.BotStatus.PENDING,
             chat_exports=chat_exports,
         )
-        bot._events_to_publish.append(cls.EventBotCreated(object_id=str(bot.id.value)))
         return bot
 
     def ensure_owned_by(
