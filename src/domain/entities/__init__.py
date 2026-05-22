@@ -3,6 +3,7 @@ from domain.entities.chat import Chat as Chat
 from domain.entities.message import Message as Message
 from domain.entities.thread import Thread as Thread
 from domain.entities.user import User as User
+from domain.entities.chat_export import ChatExport as ChatExport
 
 __all__ = [
     "Bot",
@@ -10,4 +11,5 @@ __all__ = [
     "Message",
     "Thread",
     "User",
+    "ChatExport",
 ]

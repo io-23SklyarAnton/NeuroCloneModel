@@ -14,7 +14,6 @@ _ExternalIdMap = dict[int, ID]
 
 
 class Command(ICommand):
-    bucket_name: str
     file_name: str
 
 
@@ -45,11 +44,10 @@ class CommandHandler:
             self,
             command: Command,
     ) -> None:
-        raw_json = self._storage.load(
-            bucket_name=command.bucket_name,
+        raw_bytes = await self._storage.load(
             file_name=command.file_name,
         )
-        data = json.loads(raw_json)
+        data = json.loads(raw_bytes)
         parsed_export = self._parse_export(data)
         self._persist(parsed_export)
 
@@ -232,15 +230,13 @@ if __name__ == "__main__":
     _BASE_DIR = Path(__file__).parent.parent
     uow = InMemoryUnitOfWork()
     storage = LocalStorage(
-        base_path=_BASE_DIR / "eval" / "data"
+        base_path=_BASE_DIR / "eval" / "data",
+        bucket_name="raw_chat_exports",
     )
 
     ingest_handler = CommandHandler(
         uow=uow,
         storage=storage,
     )
-    command = Command(
-        bucket_name=str(_BASE_DIR / "data"),
-        file_name="example_extended.json",
-    )
+    command = Command(file_name="result.json", )
     asyncio.run(ingest_handler.handle(command))

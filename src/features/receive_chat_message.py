@@ -53,7 +53,7 @@ class CommandHandler:
 
         self._uow.message.create(message)
         self._uow.chat.update(chat)
-        self._uow.commit()
+        await self._uow.commit()
 
     async def _get_or_create_chat(
             self,

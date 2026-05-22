@@ -2,6 +2,7 @@ __all__ = [
     "ID",
     "ValueObject",
     "DateUnixtime",
+    "ExportFileKey",
 ]
 
 import abc
@@ -47,3 +48,15 @@ class DateUnixtime(ValueObject):
         assert isinstance(other, DateUnixtime)
 
         return self.value == other.value
+
+
+class ExportFileKey(ValueObject):
+    value: str
+
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(other, ExportFileKey)
+
+        return self.value == other.value
+
+    def __str__(self) -> str:
+        return self.value

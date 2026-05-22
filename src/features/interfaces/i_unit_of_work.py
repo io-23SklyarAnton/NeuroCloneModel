@@ -22,11 +22,11 @@ class IUnitOfWork(abc.ABC):
         self.rollback()
 
     @abc.abstractmethod
-    def commit(self) -> None:
+    async def commit(self) -> None:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def flush(self) -> None: ...
+    async def flush(self) -> None: ...
 
     @abc.abstractmethod
-    def rollback(self) -> None: ...
+    async def rollback(self) -> None: ...

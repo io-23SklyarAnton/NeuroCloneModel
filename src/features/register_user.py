@@ -34,7 +34,7 @@ class CommandHandler:
                 username=command.username,
             )
             self._uow.user.update(user)
-            self._uow.commit()
+            await self._uow.commit()
 
             return Response(message=f"Welcome back!")
 
@@ -44,6 +44,6 @@ class CommandHandler:
             registered_at=get_now_datetime(),
         )
         self._uow.user.create(new_user)
-        self._uow.commit()
+        await self._uow.commit()
 
         return Response(message=f"Hello! You are registered now.")

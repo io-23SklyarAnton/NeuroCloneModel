@@ -18,11 +18,11 @@ class InMemoryUnitOfWork(IUnitOfWork):
     def __exit__(self, *args) -> None:
         self.rollback()
 
-    def commit(self) -> None:
+    async def commit(self) -> None:
         pass
 
-    def flush(self) -> None:
+    async def flush(self) -> None:
         pass
 
-    def rollback(self) -> None:
+    async def rollback(self) -> None:
         pass

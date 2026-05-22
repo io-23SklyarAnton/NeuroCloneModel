@@ -5,24 +5,21 @@ from typing import Optional
 
 class IStorage(abc.ABC):
     @abc.abstractmethod
-    def save(
+    async def save(
             self,
-            bucket_name: str,
             file_object: BytesIO,
             file_name: str,
             extra_args: Optional[dict] = None,
     ) -> str: ...
 
     @abc.abstractmethod
-    def load(
+    async def load(
             self,
-            bucket_name: str,
             file_name: str,
-    ) -> str: ...
+    ) -> bytes: ...
 
     @abc.abstractmethod
-    def exists(
+    async def exists(
             self,
-            bucket_name: str,
             file_name: str,
     ) -> bool: ...

@@ -5,7 +5,7 @@ from typing import Optional
 from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message, User as AgUser
-from dishka import FromDishka
+from dishka.integrations.aiogram import FromDishka, inject
 
 from domain.entities.user import User
 from exceptions.client.malformed_request import MissingUserException
@@ -15,6 +15,7 @@ router = Router(name="start")
 
 
 @router.message(CommandStart())
+@inject
 async def handle_start(
         message: Message,
         command_handler: FromDishka[RegisterUserCommandHandler]

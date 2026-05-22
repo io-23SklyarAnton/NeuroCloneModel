@@ -6,7 +6,6 @@ __all__ = [
 from typing import Optional
 
 from domain.entities.bot import Bot
-from domain.entities.user import User
 from domain.value_objects import ID
 from features import interfaces
 from features.base import ICommand, Response
@@ -14,7 +13,6 @@ from features.base import ICommand, Response
 
 class Command(ICommand):
     bot_id: ID
-    requester_telegram_id: User.TelegramID
 
 
 class CommandHandler:
@@ -30,18 +28,9 @@ class CommandHandler:
             self,
             command: Command,
     ) -> Response:
-        requester: Optional[User] = await self._uow.user.get_by_id_optional(command.requester_telegram_id)
-        if requester is None:
-            return Response(message="You need to register first by sending /start.")
-
         bot: Optional[Bot] = await self._uow.bot.get_by_id_optional(command.bot_id)
         if bot is None:
             return Response(message="Bot not found.")
-
-        try:
-            bot.ensure_owned_by(requester.id)
-        except Bot.NotOwnedError:
-            return Response(message="You don't own this bot.")
 
         try:
             bot.start_bot()
@@ -54,6 +43,6 @@ class CommandHandler:
         )
 
         self._uow.bot.update(bot)
-        self._uow.commit()
+        await self._uow.commit()
 
-        return Response(message=f"Bot «{bot.name.value}» is now {bot.status.value}.")
+        return Response(message=f"Bot «{bot.name.value}» started successfully.")

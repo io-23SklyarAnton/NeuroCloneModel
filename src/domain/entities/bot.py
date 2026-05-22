@@ -7,12 +7,12 @@ from domain.entities.base import Aggregate
 from domain.value_objects import ID, ValueObject
 
 if TYPE_CHECKING:
-    from domain.entities import User
+    from domain.entities import User, ChatExport
 
 
 class Bot(Aggregate):
     class BotStatus(StrEnum):
-        CREATED = "CREATED"
+        PENDING = "PENDING"
         RUNNING = "RUNNING"
         STOPPED = "STOPPED"
 
@@ -48,6 +48,9 @@ class Bot(Aggregate):
         ) -> None:
             super().__init__(f"User {requester_id} is not the owner of bot {bot_id}")
 
+    class EventBotCreated(Aggregate.IDomainEvent):
+        ...
+
     def __init__(
             self,
             id_: ID,
@@ -55,6 +58,7 @@ class Bot(Aggregate):
             token: Token,
             name: Name,
             status: BotStatus,
+            chat_exports: list["ChatExport"],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -62,6 +66,7 @@ class Bot(Aggregate):
         self._token = token
         self._name = name
         self._status = status
+        self._chat_exports = chat_exports
 
     @property
     def id(self) -> ID:
@@ -84,6 +89,10 @@ class Bot(Aggregate):
         return self._status
 
     @property
+    def chat_exports(self) -> list["ChatExport"]:
+        return self._chat_exports
+
+    @property
     def is_running(self) -> bool:
         return self._status == self.BotStatus.RUNNING
 
@@ -93,14 +102,18 @@ class Bot(Aggregate):
             owner_id: "User.TelegramID",
             token: Token,
             name: Name,
+            chat_exports: list["ChatExport"],
     ) -> "Bot":
-        return cls(
+        bot = cls(
             id_=ID.create(),
             owner_id=owner_id,
             token=token,
             name=name,
-            status=cls.BotStatus.CREATED,
+            status=cls.BotStatus.PENDING,
+            chat_exports=chat_exports,
         )
+        bot._events_to_publish.append(cls.EventBotCreated(object_id=str(bot.id.value)))
+        return bot
 
     def ensure_owned_by(
             self,
