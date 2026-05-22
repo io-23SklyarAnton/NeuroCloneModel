@@ -3,9 +3,8 @@ import json
 from dataclasses import dataclass
 from typing import Optional
 
-from domain.entities.chat import Chat
-from domain.entities.message import Message
-from domain.value_objects import ID, DateUnixtime
+from domain.entities import Chat, Message
+from domain.value_objects import ID, DateUnixtime, ExportFileKey
 from features import interfaces
 from features.base import ICommand
 from features.interfaces import IStorage
@@ -14,7 +13,7 @@ _ExternalIdMap = dict[int, ID]
 
 
 class Command(ICommand):
-    file_name: str
+    export_file_key: ExportFileKey
 
 
 class CommandHandler:
@@ -45,7 +44,7 @@ class CommandHandler:
             command: Command,
     ) -> None:
         raw_bytes = await self._storage.load(
-            file_name=command.file_name,
+            file_name=command.export_file_key.value,
         )
         data = json.loads(raw_bytes)
         parsed_export = self._parse_export(data)
@@ -238,5 +237,5 @@ if __name__ == "__main__":
         uow=uow,
         storage=storage,
     )
-    command = Command(file_name="result.json", )
+    command = Command(export_file_key=ExportFileKey(value="result.json"))
     asyncio.run(ingest_handler.handle(command))
