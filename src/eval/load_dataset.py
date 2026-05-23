@@ -3,10 +3,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from domain.entities.chat import Chat
-from domain.entities.message import Message
-from domain.value_objects import DateUnixtime
-from infrastructure.in_memory.uow import InMemoryUnitOfWork
+from ml_pipeline.domain.entities import ChatExport, ParsedMessage
+from ml_pipeline.domain.value_objects import DateUnixtime, ExportFileKey
+from ml_pipeline.infrastructure.in_memory.uow import InMemoryUnitOfWork
 
 
 @dataclass
@@ -36,44 +35,45 @@ def load_irc_dataset_to_memory(
     for channel_data in data.get("channels", []):
         messages_data = channel_data.get("messages", [])
 
-        chat_ext_id = Chat.ExternalID(value=chat_counter)
+        chat_id = ChatExport.ChatID(value=chat_counter)
         chat_counter += 1
-
-        chat = Chat(
-            external_id=chat_ext_id,
-            n_messages=len(messages_data),
-        )
-
-        uow.chat.create(chat)
 
         sorted_messages = sorted(
             messages_data,
             key=lambda x: int(x["timestamp"]),
         )
 
+        parsed_messages: list[ParsedMessage] = []
         for seq_num, msg_data in enumerate(sorted_messages, 1):
             author_name = user_mapping.get(msg_data["authorId"], "UnknownUser")
 
-            msg_ext_id = Message.ExternalID(value=msg_counter)
+            msg_ext_id = ParsedMessage.ExternalID(value=msg_counter)
             msg_counter += 1
 
             raw_text = msg_data["content"]
             clean_text = SLACK_MENTION_PATTERN.sub(r'@\1', raw_text)
 
-            message = Message.create(
+            message = ParsedMessage.create(
                 external_id=msg_ext_id,
                 reply_to_message_id=None,
-                sequence_number=Message.SequenceNumber(value=seq_num),
+                sequence_number=ParsedMessage.SequenceNumber(value=seq_num),
                 date_unixtime=DateUnixtime(value=int(msg_data["timestamp"])),
-                from_user=Message.UserName(value=author_name),
-                text=Message.Text(value=clean_text),
-                chat_id=chat_ext_id,
-                message_type=Message.Type.TEXT,
+                from_user=ParsedMessage.UserName(value=author_name),
+                text=ParsedMessage.Text(value=clean_text),
+                chat_export_id=chat_id,
+                message_type=ParsedMessage.Type.TEXT,
             )
 
             ground_truth[msg_ext_id.value] = msg_data["conversation"]
+            parsed_messages.append(message)
 
-            uow.message.create(message)
+        chat_export = ChatExport.create(
+            chat_id=chat_id,
+            owner_id=ChatExport.OwnerTelegramID(value=0),
+            export_file_key=ExportFileKey(value=f"eval-{chat_id.value}.json"),
+        )
+        chat_export.attach_parsed_messages(parsed_messages)
+        uow.chat_export.create(chat_export)
 
     return EvalDataset(
         uow=uow,

@@ -13,7 +13,6 @@ async def main() -> None:
     dp = Dispatcher()
 
     dp.include_router(start_router)
-    # dp.include_router(launch_bot_router)
 
     container = make_async_container(AppProvider())
     setup_dishka(container=container, router=dp)

@@ -5,10 +5,9 @@ from pathlib import Path
 import constants
 from eval.disentanglement_evaluator import DisentanglementEvaluator
 from eval.load_dataset import load_irc_dataset_to_memory
-from infrastructure.in_memory.uow import InMemoryUnitOfWork
-
-from features.process_chat_threads import CommandHandler, Command
-from llm import MLXInferenceEngine
+from ml_pipeline.application.features.process_chat_threads import Command, CommandHandler
+from ml_pipeline.infrastructure.in_memory.uow import InMemoryUnitOfWork
+from ml_pipeline.infrastructure.llm import MLXInferenceEngine
 
 
 async def main(
@@ -20,18 +19,18 @@ async def main(
 
     eval_data = load_irc_dataset_to_memory(
         json_filepath=dataset_path,
-        uow=uow
+        uow=uow,
     )
 
     ground_truth = eval_data.ground_truth
 
-    chats = uow.chat.get_all()
-    if not chats:
-        print("Error: No chats found in the database!")
+    chat_exports = uow.chat_export.get_all()
+    if not chat_exports:
+        print("Error: No chat exports found in the database!")
         return
 
-    target_chat = chats[0]
-    all_messages = uow.message.get_all()
+    target_chat_export = chat_exports[0]
+    all_messages = target_chat_export.parsed_messages
     print(f"Loaded messages: {len(all_messages)}")
 
     predictions = {}
@@ -45,7 +44,7 @@ async def main(
         engine = MLXInferenceEngine(base_model)
         handler = CommandHandler(uow=uow, inference_engine=engine)
 
-        command = Command(chat_id=target_chat.external_id)
+        command = Command(chat_export_id=target_chat_export.chat_id)
 
         await handler.handle(command)
         print("Inference completed! Collecting predictions...")
@@ -63,7 +62,7 @@ async def main(
 
     evaluator = DisentanglementEvaluator(
         ground_truth=ground_truth,
-        predictions=predictions
+        predictions=predictions,
     )
 
     evaluator.print_report()
@@ -71,12 +70,11 @@ async def main(
 
 if __name__ == "__main__":
     dataset_path = Path(__file__).parent / "CODI" / "validation.json"
-    cache_path = Path(__file__).parent / "cache" / "predictions_1_cache_with_fast.json"
+    cache_path = Path(__file__).parent / "cache" / "validation_predictions" / "qwen_3.5_4b.json"
     base_model = constants.AvailableModel.QWEN_3_5_4B
 
     asyncio.run(main(
         dataset_path=dataset_path,
         cache_path=cache_path,
         base_model=base_model,
-    )
-    )
+    ))

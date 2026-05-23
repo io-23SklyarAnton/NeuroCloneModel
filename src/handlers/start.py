@@ -7,9 +7,9 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, User as AgUser
 from dishka.integrations.aiogram import FromDishka, inject
 
-from domain.entities.user import User
-from exceptions.client.malformed_request import MissingUserException
-from features import RegisterUserCommand, RegisterUserCommandHandler
+from common.exceptions.client.malformed_request import MissingUserException
+from iam.application.features import RegisterUserCommand, RegisterUserCommandHandler
+from iam.domain.entities import User
 
 router = Router(name="start")
 
@@ -18,7 +18,7 @@ router = Router(name="start")
 @inject
 async def handle_start(
         message: Message,
-        command_handler: FromDishka[RegisterUserCommandHandler]
+        command_handler: FromDishka[RegisterUserCommandHandler],
 ) -> None:
     if message.from_user is None:
         raise MissingUserException()

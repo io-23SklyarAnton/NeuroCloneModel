@@ -1,0 +1,1 @@
+USER_BOT_LIMIT = 5
