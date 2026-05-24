@@ -3,7 +3,7 @@ __all__ = ["InMemoryThreadRepository"]
 from typing import Optional
 
 from common.domain.value_objects import ID
-from common.infrastructure.in_memory_repository import InMemoryBaseRepository
+from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from ml_pipeline.application.interfaces.repositories import IThreadRepository
 from ml_pipeline.domain.entities import ChatExport, Thread
 

@@ -93,6 +93,8 @@ propcache==0.5.2
     # via yarl
 protobuf==7.34.1
     # via mlx-lm
+psycopg2-binary==2.9.12
+    # via neuroclonemodel
 pydantic==2.13.3
     # via aiogram
     # via neuroclonemodel
@@ -119,6 +121,8 @@ sentencepiece==0.2.1
     # via mlx-lm
 shellingham==1.5.4
     # via typer
+sqlalchemy==2.0.49
+    # via neuroclonemodel
 threadpoolctl==3.6.0
     # via scikit-learn
 tokenizers==0.22.2
@@ -138,6 +142,7 @@ typing-extensions==4.15.0
     # via huggingface-hub
     # via pydantic
     # via pydantic-core
+    # via sqlalchemy
     # via typing-inspection
 typing-inspection==0.4.2
     # via pydantic

@@ -1,4 +1,7 @@
-__all__ = ["BaseAppException"]
+__all__ = [
+    "BaseAppException",
+    "UnexpectedError",
+]
 
 
 class BaseAppException(Exception):
@@ -8,3 +11,8 @@ class BaseAppException(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+class UnexpectedError(BaseAppException):
+    def __init__(self, message: str = "An unexpected error occurred"):
+        super().__init__(message)

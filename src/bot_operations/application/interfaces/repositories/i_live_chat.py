@@ -4,7 +4,7 @@ import abc
 from typing import Optional
 
 from bot_operations.domain.entities import LiveChat
-from common.infrastructure.i_base_repository import IBaseRepository
+from common.infrastructure.db.i_base_repository import IBaseRepository
 
 
 class ILiveChatRepository(IBaseRepository[LiveChat]):

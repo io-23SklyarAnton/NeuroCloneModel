@@ -3,7 +3,7 @@ __all__ = ["InMemoryBaseRepository"]
 from typing import Any, Generic, Optional, TypeVar
 
 from common.domain.entities import Aggregate
-from common.infrastructure.i_base_repository import IBaseRepository
+from common.infrastructure.db.i_base_repository import IBaseRepository
 
 T_Aggregate = TypeVar("T_Aggregate", bound=Aggregate)
 

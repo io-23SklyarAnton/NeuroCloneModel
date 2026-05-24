@@ -4,7 +4,7 @@ import abc
 from typing import Optional
 
 from common.domain.value_objects import ID
-from common.infrastructure.i_base_repository import IBaseRepository
+from common.infrastructure.db.i_base_repository import IBaseRepository
 from ml_pipeline.domain.entities import TrainingDataset
 
 

@@ -3,7 +3,7 @@ __all__ = ["IUserRepository"]
 import abc
 from typing import Optional
 
-from common.infrastructure.i_base_repository import IBaseRepository
+from common.infrastructure.db.i_base_repository import IBaseRepository
 from iam.domain.entities import User
 
 

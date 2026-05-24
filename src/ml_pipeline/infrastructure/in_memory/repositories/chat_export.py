@@ -2,7 +2,7 @@ __all__ = ["InMemoryChatExportRepository"]
 
 from typing import Optional
 
-from common.infrastructure.in_memory_repository import InMemoryBaseRepository
+from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from ml_pipeline.application.interfaces.repositories import IChatExportRepository
 from ml_pipeline.domain.entities import ChatExport
 

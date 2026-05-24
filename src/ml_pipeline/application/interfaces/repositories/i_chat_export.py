@@ -3,7 +3,7 @@ __all__ = ["IChatExportRepository"]
 import abc
 from typing import Optional
 
-from common.infrastructure.i_base_repository import IBaseRepository
+from common.infrastructure.db.i_base_repository import IBaseRepository
 from ml_pipeline.domain.entities import ChatExport
 
 

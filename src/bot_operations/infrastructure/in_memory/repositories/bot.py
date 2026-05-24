@@ -5,7 +5,7 @@ from typing import Optional
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot
 from common.domain.value_objects import ID
-from common.infrastructure.in_memory_repository import InMemoryBaseRepository
+from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 
 
 class InMemoryBotRepository(InMemoryBaseRepository[Bot], IBotRepository):

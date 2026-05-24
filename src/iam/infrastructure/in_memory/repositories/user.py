@@ -2,7 +2,7 @@ __all__ = ["InMemoryUserRepository"]
 
 from typing import Optional
 
-from common.infrastructure.in_memory_repository import InMemoryBaseRepository
+from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from iam.application.interfaces.repositories import IUserRepository
 from iam.domain.entities import User
 
