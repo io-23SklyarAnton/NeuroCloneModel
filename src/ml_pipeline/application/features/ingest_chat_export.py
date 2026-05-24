@@ -5,7 +5,7 @@ __all__ = [
 
 import asyncio
 import json
-from typing import Optional
+from typing import Iterator, Optional
 
 from common.application.base import ICommand
 from common.domain.value_objects import ID
@@ -14,6 +14,7 @@ from ml_pipeline.domain.entities import ChatExport, ParsedMessage
 from ml_pipeline.domain.value_objects import DateUnixtime, ExportFileKey
 
 _ExternalIdMap = dict[int, ID]
+_PERSIST_BATCH_SIZE = 1000
 
 
 class Command(ICommand):
@@ -50,37 +51,65 @@ class CommandHandler:
         chat_id = ChatExport.ChatID(value=int(data["id"]))
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(chat_id)
 
-        parsed_messages: list[ParsedMessage] = self._parse_messages(
+        total_persisted = await self._persist_messages_in_batches(
             raw_messages=data["messages"],
             chat_export_id=chat_export.chat_id,
         )
 
-        chat_export.attach_parsed_messages(parsed_messages)
+        chat_export.record_message_count(total_persisted)
         self._uow.chat_export.update(chat_export)
         await self._uow.commit()
 
-    def _parse_messages(
+    async def _persist_messages_in_batches(
             self,
             raw_messages: list[dict],
             chat_export_id: ChatExport.ChatID,
-    ) -> list[ParsedMessage]:
+    ) -> int:
         external_id_map: _ExternalIdMap = {}
-        messages: list[ParsedMessage] = []
+        total_persisted = 0
+        batch: list[ParsedMessage] = []
+
+        for message in self._iter_parsed_messages(
+                raw_messages=raw_messages,
+                chat_export_id=chat_export_id,
+                external_id_map=external_id_map,
+        ):
+            batch.append(message)
+
+            if len(batch) >= _PERSIST_BATCH_SIZE:
+                self._uow.parsed_message.create_many(batch)
+                await self._uow.flush()
+                total_persisted += len(batch)
+                batch = []
+
+        if batch:
+            self._uow.parsed_message.create_many(batch)
+            await self._uow.flush()
+            total_persisted += len(batch)
+
+        return total_persisted
+
+    def _iter_parsed_messages(
+            self,
+            raw_messages: list[dict],
+            chat_export_id: ChatExport.ChatID,
+            external_id_map: _ExternalIdMap,
+    ) -> Iterator[ParsedMessage]:
+        sequence_number = 0
 
         for raw in raw_messages:
             message: Optional[ParsedMessage] = self._try_parse_message(
                 raw=raw,
-                sequence_number=len(messages) + 1,
+                sequence_number=sequence_number + 1,
                 chat_export_id=chat_export_id,
                 external_id_map=external_id_map,
             )
             if message is None:
                 continue
 
+            sequence_number += 1
             external_id_map[raw["id"]] = message.id
-            messages.append(message)
-
-        return messages
+            yield message
 
     def _try_parse_message(
             self,

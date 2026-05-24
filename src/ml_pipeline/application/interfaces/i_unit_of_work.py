@@ -8,6 +8,7 @@ from ml_pipeline.application.interfaces import repositories
 
 class IUnitOfWork(abc.ABC):
     chat_export: repositories.IChatExportRepository
+    parsed_message: repositories.IParsedMessageRepository
     thread: repositories.IThreadRepository
     training_dataset: repositories.ITrainingDatasetRepository
 

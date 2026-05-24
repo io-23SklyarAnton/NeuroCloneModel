@@ -4,7 +4,7 @@ import abc
 from typing import Optional
 
 from common.infrastructure.i_base_repository import IBaseRepository
-from ml_pipeline.domain.entities import ChatExport, ParsedMessage
+from ml_pipeline.domain.entities import ChatExport
 
 
 class IChatExportRepository(IBaseRepository[ChatExport]):
@@ -19,11 +19,3 @@ class IChatExportRepository(IBaseRepository[ChatExport]):
             self,
             chat_id: ChatExport.ChatID,
     ) -> Optional[ChatExport]: ...
-
-    @abc.abstractmethod
-    async def get_messages_batch(
-            self,
-            chat_id: ChatExport.ChatID,
-            offset: int,
-            limit: int,
-    ) -> list[ParsedMessage]: ...

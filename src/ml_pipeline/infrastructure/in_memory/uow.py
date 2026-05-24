@@ -7,10 +7,8 @@ from ml_pipeline.infrastructure.in_memory import repositories
 class InMemoryUnitOfWork(IUnitOfWork):
     def __init__(self) -> None:
         self.chat_export = repositories.InMemoryChatExportRepository({})
-        self.thread = repositories.InMemoryThreadRepository(
-            chat_export_repository=self.chat_export,
-            storage={},
-        )
+        self.parsed_message = repositories.InMemoryParsedMessageRepository({})
+        self.thread = repositories.InMemoryThreadRepository({})
         self.training_dataset = repositories.InMemoryTrainingDatasetRepository({})
 
     def __enter__(self) -> "InMemoryUnitOfWork":

@@ -12,12 +12,17 @@ from typing_extensions import Self
 import jinja2
 import pydantic
 
-from ml_pipeline.application import constants
 from common.application.base import ICommand
 from common.domain.value_objects import ID
+from ml_pipeline.application import constants
 from ml_pipeline.application.interfaces import IInferenceEngine, IUnitOfWork
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage, Thread
 from ml_pipeline.domain.value_objects import DateUnixtime
+
+
+_BATCH_SIZE_DIALOGUE_DISENTANGLEMENT = 20
+_DIALOGUE_DISENTANGLEMENT_TEMPLATE_NAME = 'thread_decision.jinja2'
+
 
 
 class Command(ICommand):
@@ -66,19 +71,19 @@ class CommandHandler:
         template_loader = jinja2.FileSystemLoader(str(constants.PROMPTS_DIR))
         self._jinja_env = jinja2.Environment(loader=template_loader, autoescape=False)
 
-        self._disentanglement_template = self._jinja_env.get_template(
-            constants.DIALOGUE_DISENTANGLEMENT_TEMPLATE_NAME
-        )
+        self._disentanglement_template = self._jinja_env.get_template(_DIALOGUE_DISENTANGLEMENT_TEMPLATE_NAME)
 
     async def handle(self, command: Command) -> None:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
         chat_export.mark_disentangling()
 
-        for offset in range(0, chat_export.n_messages, constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
+        for offset in range(0, chat_export.n_messages, _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
             await self._process_batch(
                 chat_export_id=command.chat_export_id,
                 offset=offset,
             )
+
+            await self._uow.commit()
 
         chat_export.mark_ready()
         self._uow.chat_export.update(chat_export)
@@ -97,12 +102,12 @@ class CommandHandler:
         messages: list[ParsedMessage] = await self._get_batch_of_messages(
             chat_export_id=chat_export_id,
             offset=offset,
-            limit=constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+            limit=_BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
         )
         messages_sub: list[ParsedMessage] = await self._get_batch_of_messages(
             chat_export_id=chat_export_id,
             offset=offset + 1,
-            limit=constants.W_SUB + constants.BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+            limit=constants.W_SUB + _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
         )
 
         for i, message in enumerate(messages, 1):
@@ -128,6 +133,8 @@ class CommandHandler:
         if determined_thread is not None:
             determined_thread.add_message(message)
             message.assign_to_thread(determined_thread.id)
+            self._uow.thread.update(determined_thread)
+            self._uow.parsed_message.update(message)
 
         self._remove_outdated_threads(message.sequence_number)
 
@@ -162,14 +169,20 @@ class CommandHandler:
             message: ParsedMessage,
     ) -> Optional[Thread]:
         thread: Optional[Thread] = self._get_thread_from_active_threads_by_message_id(message.reply_to_message_id)
+        if thread is not None:
+            return thread
+
+        reply_message: Optional[ParsedMessage] = await self._uow.parsed_message.get_by_id_optional(
+            message.reply_to_message_id,
+        )
+        if reply_message is None or reply_message.thread_id is None:
+            return None
+
+        thread = await self._uow.thread.get_by_id_optional(reply_message.thread_id)
         if thread is None:
-            thread = await self._uow.thread.get_by_message_id(message.reply_to_message_id)
+            return None
 
-            if thread is None:
-                return None
-
-            self._add_thread_to_active(thread)
-
+        self._add_thread_to_active(thread)
         return thread
 
     async def _determine_non_replied_message_thread(
@@ -281,8 +294,8 @@ class CommandHandler:
             offset: int,
             limit: int,
     ) -> list[ParsedMessage]:
-        return await self._uow.chat_export.get_messages_batch(
-            chat_id=chat_export_id,
+        return await self._uow.parsed_message.get_batch_by_chat_export_id(
+            chat_export_id=chat_export_id,
             offset=offset,
             limit=limit,
         )

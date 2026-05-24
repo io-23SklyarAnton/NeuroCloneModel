@@ -85,7 +85,7 @@ class CommandHandler:
         threads = await self._uow.thread.get_all_by_chat_export_id(chat_export_id)
         pairs: list[CommandHandler.ImitationPair] = []
         for thread in threads:
-            messages = await self._uow.thread.get_messages_by_thread_id(thread.id)
+            messages = await self._uow.parsed_message.get_by_thread_id(thread.id)
             pairs.extend(self._pairs_from_thread(messages, target_user))
 
         return pairs

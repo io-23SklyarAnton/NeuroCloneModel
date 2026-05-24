@@ -3,7 +3,8 @@ __all__ = ["Thread"]
 from ml_pipeline.application import constants
 from common.domain.entities import Aggregate
 from common.domain.value_objects import ID
-from ml_pipeline.domain.entities.chat_export import ChatExport, ParsedMessage
+from ml_pipeline.domain.entities.chat_export import ChatExport
+from ml_pipeline.domain.entities.parsed_message import ParsedMessage
 
 
 class Thread(Aggregate):

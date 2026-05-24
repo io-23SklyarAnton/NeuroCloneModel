@@ -38,12 +38,19 @@ def load_irc_dataset_to_memory(
         chat_id = ChatExport.ChatID(value=chat_counter)
         chat_counter += 1
 
+        chat_export = ChatExport.create(
+            chat_id=chat_id,
+            owner_id=ChatExport.OwnerTelegramID(value=0),
+            export_file_key=ExportFileKey(value=f"eval-{chat_id.value}.json"),
+        )
+        uow.chat_export.create(chat_export)
+
         sorted_messages = sorted(
             messages_data,
             key=lambda x: int(x["timestamp"]),
         )
 
-        parsed_messages: list[ParsedMessage] = []
+        parsed_batch: list[ParsedMessage] = []
         for seq_num, msg_data in enumerate(sorted_messages, 1):
             author_name = user_mapping.get(msg_data["authorId"], "UnknownUser")
 
@@ -65,15 +72,11 @@ def load_irc_dataset_to_memory(
             )
 
             ground_truth[msg_ext_id.value] = msg_data["conversation"]
-            parsed_messages.append(message)
+            parsed_batch.append(message)
 
-        chat_export = ChatExport.create(
-            chat_id=chat_id,
-            owner_id=ChatExport.OwnerTelegramID(value=0),
-            export_file_key=ExportFileKey(value=f"eval-{chat_id.value}.json"),
-        )
-        chat_export.attach_parsed_messages(parsed_messages)
-        uow.chat_export.create(chat_export)
+        uow.parsed_message.create_many(parsed_batch)
+        chat_export.record_message_count(len(parsed_batch))
+        uow.chat_export.update(chat_export)
 
     return EvalDataset(
         uow=uow,

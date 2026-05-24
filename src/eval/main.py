@@ -30,7 +30,7 @@ async def main(
         return
 
     target_chat_export = chat_exports[0]
-    all_messages = target_chat_export.parsed_messages
+    all_messages = uow.parsed_message.get_all()
     print(f"Loaded messages: {len(all_messages)}")
 
     predictions = {}
