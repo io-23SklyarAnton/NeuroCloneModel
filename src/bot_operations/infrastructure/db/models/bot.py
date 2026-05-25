@@ -3,6 +3,7 @@ __all__ = [
 ]
 
 import uuid
+from typing import Optional
 
 from sqlalchemy import BigInteger, Enum, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -40,6 +41,11 @@ class Bot(Base):
         ARRAY(UUID(as_uuid=True)),
         nullable=False,
         default=list,
+    )
+    lora_path: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+        default=None,
     )
 
     __table_args__ = (

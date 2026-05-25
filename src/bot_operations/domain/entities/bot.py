@@ -1,6 +1,7 @@
 __all__ = ["Bot"]
 
 from enum import StrEnum
+from typing import Optional
 
 from common.domain.entities import Aggregate
 from common.domain.value_objects import ID, ValueObject
@@ -50,6 +51,17 @@ class Bot(Aggregate):
         def __hash__(self) -> int:
             return hash(self.value)
 
+    class LoraPath(ValueObject):
+        value: str
+
+        def __eq__(self, other: object) -> bool:
+            assert isinstance(other, Bot.LoraPath)
+
+            return self.value == other.value
+
+        def __str__(self) -> str:
+            return self.value
+
     class IllegalStateTransitionError(RuntimeError):
         def __init__(
                 self,
@@ -74,6 +86,7 @@ class Bot(Aggregate):
             name: Name,
             status: BotStatus,
             linked_dataset_ids: list[LinkedDatasetID],
+            lora_path: Optional[LoraPath],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -82,6 +95,7 @@ class Bot(Aggregate):
         self._name = name
         self._status = status
         self._linked_dataset_ids = linked_dataset_ids
+        self._lora_path = lora_path
 
     @property
     def id(self) -> ID:
@@ -108,6 +122,10 @@ class Bot(Aggregate):
         return self._linked_dataset_ids
 
     @property
+    def lora_path(self) -> Optional[LoraPath]:
+        return self._lora_path
+
+    @property
     def is_running(self) -> bool:
         return self._status == self.BotStatus.RUNNING
 
@@ -118,6 +136,7 @@ class Bot(Aggregate):
             token: Token,
             name: Name,
             linked_dataset_ids: list[LinkedDatasetID],
+            lora_path: Optional[LoraPath] = None,
     ) -> "Bot":
         bot = cls(
             id_=ID.create(),
@@ -126,6 +145,7 @@ class Bot(Aggregate):
             name=name,
             status=cls.BotStatus.PENDING,
             linked_dataset_ids=linked_dataset_ids,
+            lora_path=lora_path,
         )
         return bot
 
@@ -144,6 +164,15 @@ class Bot(Aggregate):
             return
 
         self._linked_dataset_ids.append(dataset_id)
+
+    def attach_lora(
+            self,
+            lora_path: LoraPath,
+    ) -> None:
+        self._lora_path = lora_path
+
+    def detach_lora(self) -> None:
+        self._lora_path = None
 
     def start_bot(self) -> None:
         if self.is_running:

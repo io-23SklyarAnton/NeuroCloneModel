@@ -76,6 +76,10 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 linked_dataset_id.value.value
                 for linked_dataset_id in aggregate.linked_dataset_ids
             ],
+            lora_path=(
+                aggregate.lora_path.value
+                if aggregate.lora_path is not None else None
+            ),
         )
 
     def from_db_model_to_aggregate(
@@ -92,6 +96,10 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 BotAggregate.LinkedDatasetID(value=ID(value=linked_dataset_id))
                 for linked_dataset_id in db_model.linked_dataset_ids
             ],
+            lora_path=(
+                BotAggregate.LoraPath(value=db_model.lora_path)
+                if db_model.lora_path is not None else None
+            ),
         )
 
     def _filter_by_id(
