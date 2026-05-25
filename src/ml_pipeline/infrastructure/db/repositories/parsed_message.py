@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from common.infrastructure.db.models import OutboxMessage
 from ml_pipeline.application.interfaces.repositories import IParsedMessageRepository
@@ -144,7 +144,7 @@ class ParsedMessageRepository(
             ),
             sequence_number=ParsedMessageAggregate.SequenceNumber(value=db_model.sequence_number),
             date_unixtime=DateUnixtime(value=db_model.date_unixtime),
-            from_user=ParsedMessageAggregate.UserName(value=db_model.from_user),
+            from_user=UserName(value=db_model.from_user),
             text=ParsedMessageAggregate.Text(value=db_model.text),
             chat_export_id=ChatExport.ChatID(value=db_model.chat_export_id),
             thread_id=(

@@ -6,18 +6,10 @@ __all__ = [
 from datetime import datetime
 
 from common.domain.entities import Aggregate, Entity
-from common.domain.value_objects import ID, ValueObject
+from common.domain.value_objects import ID, ValueObject, UserName
 
 
 class LiveMessage(Entity):
-    class UserName(ValueObject):
-        value: str
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, LiveMessage.UserName)
-
-            return self.value == other.value
-
     class Text(ValueObject):
         value: str
 

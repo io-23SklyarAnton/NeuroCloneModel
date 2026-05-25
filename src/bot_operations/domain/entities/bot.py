@@ -6,7 +6,7 @@ from typing import Optional, Self
 from pydantic import model_validator
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject
+from common.domain.value_objects import ID, ValueObject, UserName
 
 
 class Bot(Aggregate):
@@ -104,6 +104,7 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
+            target_user_name: UserName,
             status: BotStatus,
             linked_dataset_ids: list[LinkedDatasetID],
             lora_path: Optional[LoraPath],
@@ -114,6 +115,7 @@ class Bot(Aggregate):
         self._owner_id = owner_id
         self._token = token
         self._name = name
+        self._target_user_name = target_user_name
         self._status = status
         self._linked_dataset_ids = linked_dataset_ids
         self._lora_path = lora_path
@@ -134,6 +136,10 @@ class Bot(Aggregate):
     @property
     def name(self) -> Name:
         return self._name
+
+    @property
+    def target_user_name(self) -> UserName:
+        return self._target_user_name
 
     @property
     def status(self) -> BotStatus:
@@ -161,6 +167,7 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
+            target_user_name: UserName,
             linked_dataset_ids: list[LinkedDatasetID],
     ) -> "Bot":
         bot = cls(
@@ -168,19 +175,13 @@ class Bot(Aggregate):
             owner_id=owner_id,
             token=token,
             name=name,
+            target_user_name=target_user_name,
             status=cls.BotStatus.PENDING,
             linked_dataset_ids=linked_dataset_ids,
             lora_path=None,
             reply_period=None,
         )
         return bot
-
-    def ensure_owned_by(
-            self,
-            user_id: OwnerTelegramID,
-    ) -> None:
-        if not (self._owner_id == user_id):
-            raise Bot.NotOwnedError(bot_id=self._id, requester_id=user_id)
 
     def link_dataset(
             self,
@@ -197,9 +198,6 @@ class Bot(Aggregate):
     ) -> None:
         self._lora_path = lora_path
 
-    def detach_lora(self) -> None:
-        self._lora_path = None
-
     def set_reply_period(
             self,
             reply_period: ReplyPeriod,
@@ -214,12 +212,3 @@ class Bot(Aggregate):
             )
 
         self._status = self.BotStatus.RUNNING
-
-    def stop_bot(self) -> None:
-        if not self.is_running:
-            raise Bot.IllegalStateTransitionError(
-                current=self._status,
-                requested=self.BotStatus.STOPPED,
-            )
-
-        self._status = self.BotStatus.STOPPED

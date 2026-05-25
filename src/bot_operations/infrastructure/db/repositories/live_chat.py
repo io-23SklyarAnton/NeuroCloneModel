@@ -11,7 +11,7 @@ from bot_operations.domain.entities import LiveChat as LiveChatAggregate
 from bot_operations.domain.entities import LiveMessage
 from bot_operations.infrastructure.db.models import LiveChat as DBLiveChat
 from bot_operations.infrastructure.db.models import LiveMessage as DBLiveMessage
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 
@@ -95,7 +95,7 @@ class LiveChatRepository(ILiveChatRepository, BaseRepository[LiveChatAggregate, 
     ) -> LiveMessage:
         return LiveMessage(
             id_=ID(value=db_model.id),
-            from_user=LiveMessage.UserName(value=db_model.from_user),
+            from_user=UserName(value=db_model.from_user),
             text=LiveMessage.Text(value=db_model.text),
             sent_at=db_model.sent_at,
             is_from_bot=db_model.is_from_bot,

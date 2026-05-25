@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from ml_pipeline.application import constants
 from ml_pipeline.application.interfaces.repositories import IThreadRepository
@@ -16,10 +16,7 @@ from ml_pipeline.infrastructure.db.models import ParsedMessage as DBParsedMessag
 from ml_pipeline.infrastructure.db.models import Thread as DBThread
 
 
-class ThreadRepository(
-        IThreadRepository,
-        BaseRepository[ThreadAggregate, DBThread],
-):
+class ThreadRepository(IThreadRepository, BaseRepository[ThreadAggregate, DBThread]):
     @property
     def model(self) -> type[DBThread]:
         return DBThread
@@ -105,7 +102,7 @@ class ThreadRepository(
             ),
             sequence_number=ParsedMessage.SequenceNumber(value=db_model.sequence_number),
             date_unixtime=DateUnixtime(value=db_model.date_unixtime),
-            from_user=ParsedMessage.UserName(value=db_model.from_user),
+            from_user=UserName(value=db_model.from_user),
             text=ParsedMessage.Text(value=db_model.text),
             chat_export_id=ChatExport.ChatID(value=db_model.chat_export_id),
             thread_id=(

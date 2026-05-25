@@ -14,8 +14,9 @@ import pydantic
 
 from common.application.base import ICommand
 from common.domain.value_objects import ID
+from infrastructure.llm import IInferenceEngine
 from ml_pipeline.application import constants
-from ml_pipeline.application.interfaces import IInferenceEngine, IUnitOfWork
+from ml_pipeline.application.interfaces import IUnitOfWork
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage, Thread
 from ml_pipeline.domain.value_objects import DateUnixtime
 

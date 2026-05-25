@@ -3,7 +3,7 @@ __all__ = ["TrainingDataset"]
 from datetime import datetime
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject
+from common.domain.value_objects import ID, ValueObject, UserName
 from ml_pipeline.domain.entities.chat_export import ChatExport
 from ml_pipeline.domain.value_objects import DatasetFileKey
 
@@ -20,19 +20,11 @@ class TrainingDataset(Aggregate):
         def __hash__(self) -> int:
             return hash(self.value)
 
-    class TargetUserName(ValueObject):
-        value: str
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, TrainingDataset.TargetUserName)
-
-            return self.value == other.value
-
     def __init__(
             self,
             id_: ID,
             owner_id: OwnerTelegramID,
-            target_user: TargetUserName,
+            target_user: UserName,
             source_chat_export_ids: list[ChatExport.ChatID],
             file_key: DatasetFileKey,
             n_pairs: int,
@@ -56,7 +48,7 @@ class TrainingDataset(Aggregate):
         return self._owner_id
 
     @property
-    def target_user(self) -> TargetUserName:
+    def target_user(self) -> UserName:
         return self._target_user
 
     @property
@@ -79,7 +71,7 @@ class TrainingDataset(Aggregate):
     def create(
             cls,
             owner_id: OwnerTelegramID,
-            target_user: TargetUserName,
+            target_user: UserName,
             source_chat_export_ids: list[ChatExport.ChatID],
             file_key: DatasetFileKey,
             n_pairs: int,

@@ -7,24 +7,21 @@ __all__ = [
 import random
 from typing import Optional
 
+import jinja2
 import pydantic
 
 from bot_operations.application import constants
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot, LiveChat, LiveMessage
 from common.application.base import ICommand
-from common.domain.value_objects import ID
-from common.exceptions.base import UnexpectedError
-from ml_pipeline.application import constants as ml_pipeline_constants
-from ml_pipeline.application.interfaces import IInferenceEngine
-from ml_pipeline.application.services import ImitationContextFormatter
+from common.domain.value_objects import ID, UserName
+from infrastructure.llm import IInferenceEngine
 from utils import get_now_datetime
 
 
 class Command(ICommand):
     bot_id: ID
     chat_external_id: LiveChat.ExternalID
-    user_name: LiveMessage.UserName
     text: LiveMessage.Text
 
 
@@ -37,11 +34,16 @@ class CommandHandler:
             self,
             uow: IUnitOfWork,
             inference_engine: IInferenceEngine,
-            context_formatter: ImitationContextFormatter,
     ) -> None:
         self._uow = uow
         self._inference_engine = inference_engine
-        self._context_formatter = context_formatter
+
+        loader: jinja2.FileSystemLoader = jinja2.FileSystemLoader(searchpath=str(constants.PROMPTS_DIR))
+        env: jinja2.Environment = jinja2.Environment(
+            loader=loader,
+            autoescape=False,
+        )
+        self._template: jinja2.Template = env.get_template(constants.REPLY_CONTEXT_TEMPLATE_NAME)
 
     async def handle(
             self,
@@ -69,14 +71,18 @@ class CommandHandler:
             await self._uow.commit()
             return Response(reply_text=None)
 
+        if bot.lora_path is None:
+            print(f"ERROR: Bot {bot.id.value} is configured to reply, but has no LoRA path set. Skipping reply.")
+            return Response(reply_text=None)
+
         generated_text: str = await self._generate_reply(
-            bot=bot,
-            live_chat=live_chat,
-            target_user_name=command.user_name,
+            recent_messages=live_chat.recent_messages,
+            target_user_name=bot.target_user_name,
+            lora_path=bot.lora_path,
         )
 
         bot_message: LiveMessage = LiveMessage.create_bot_message(
-            from_user=LiveMessage.UserName(value=bot.name.value),
+            from_user=bot.target_user_name,
             text=LiveMessage.Text(value=generated_text),
             sent_at=get_now_datetime(),
         )
@@ -109,44 +115,48 @@ class CommandHandler:
             bot: Bot,
             live_chat: LiveChat,
     ) -> bool:
-        messages_since_last_reply: int = live_chat.count_messages_since_last_bot_reply()
-        reply_period: int = bot.reply_period.value
+        if bot.reply_period is None:
+            print(f"ERROR: Bot {bot.id.value} has no reply period set, but received a message. Skipping reply.")
+            return False
 
-        probability: float = min(1.0, messages_since_last_reply / reply_period)
-        return random.random() < probability
+        messages_since_last_reply: int = live_chat.count_messages_since_last_bot_reply()
+        if messages_since_last_reply == 0:
+            return False
+
+        geometric_trial_probability: float = 1.0 / bot.reply_period.value
+        return random.random() < geometric_trial_probability
 
     async def _generate_reply(
             self,
-            bot: Bot,
-            live_chat: LiveChat,
-            target_user_name: LiveMessage.UserName,
+            recent_messages: list[LiveMessage],
+            target_user_name: UserName,
+            lora_path: Optional[Bot.LoraPath],
     ) -> str:
-        if bot.lora_path is None:
-            raise UnexpectedError(f"Bot {bot.id.value} is not trained yet")
-
-        user_prompt: str = self._build_user_prompt(live_chat)
-        system_prompt: str = ml_pipeline_constants.IMITATION_SYSTEM_PROMPT.format(
+        user_prompt: str = self._build_user_prompt(recent_messages)
+        system_prompt: str = constants.REPLY_SYSTEM_PROMPT.format(
             target_user=target_user_name.value,
         )
 
         return await self._inference_engine.generate_async(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            lora_path=bot.lora_path.value,
+            lora_path=lora_path.value,
             max_tokens=constants.REPLY_MAX_TOKENS,
-            temp=constants.REPLY_TEMP,
+            temp=constants.REPLY_TEMPERATURE,
             priority=constants.REPLY_PRIORITY,
         )
 
     def _build_user_prompt(
             self,
-            live_chat: LiveChat,
+            messages: list[LiveMessage],
     ) -> str:
-        formatter_messages: list[ImitationContextFormatter.Message] = [
-            ImitationContextFormatter.Message(
-                sender=message.from_user.value,
-                text=message.text.value,
-            )
-            for message in live_chat.recent_messages
+        window = messages[-constants.CONTEXT_WINDOW_MESSAGES:]
+        messages_data = [
+            {
+                "sender": msg.from_user.value,
+                "text": msg.text.value,
+            }
+            for msg in window
+
         ]
-        return self._context_formatter.format(formatter_messages)
+        return self._template.render(messages=messages_data)

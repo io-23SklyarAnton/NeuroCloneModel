@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot as BotAggregate
 from bot_operations.infrastructure.db.models import Bot as DBBot
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 
@@ -71,6 +71,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_telegram_id=aggregate.owner_id.value,
             token=aggregate.token.value,
             name=aggregate.name.value,
+            target_user_name=aggregate.target_user_name.value,
             status=aggregate.status,
             linked_dataset_ids=[
                 linked_dataset_id.value.value
@@ -80,7 +81,10 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 aggregate.lora_path.value
                 if aggregate.lora_path is not None else None
             ),
-            reply_period=aggregate.reply_period.value,
+            reply_period=(
+                aggregate.reply_period.value
+                if aggregate.reply_period is not None else None
+            ),
         )
 
     def from_db_model_to_aggregate(
@@ -92,6 +96,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_id=BotAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
             token=BotAggregate.Token(value=db_model.token),
             name=BotAggregate.Name(value=db_model.name),
+            target_user_name=UserName(value=db_model.target_user_name),
             status=db_model.status,
             linked_dataset_ids=[
                 BotAggregate.LinkedDatasetID(value=ID(value=linked_dataset_id))
@@ -101,7 +106,10 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 BotAggregate.LoraPath(value=db_model.lora_path)
                 if db_model.lora_path is not None else None
             ),
-            reply_period=BotAggregate.ReplyPeriod(value=db_model.reply_period),
+            reply_period=(
+                BotAggregate.ReplyPeriod(value=db_model.reply_period)
+                if db_model.reply_period is not None else None
+            ),
         )
 
     def _filter_by_id(

@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Optional
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject
+from common.domain.value_objects import ID, ValueObject, UserName
 from ml_pipeline.domain.entities.chat_export import ChatExport
 from ml_pipeline.domain.value_objects import DateUnixtime
 
@@ -38,14 +38,6 @@ class ParsedMessage(Aggregate):
 
         def __eq__(self, other: object) -> bool:
             assert isinstance(other, ParsedMessage.SequenceNumber)
-
-            return self.value == other.value
-
-    class UserName(ValueObject):
-        value: str
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, ParsedMessage.UserName)
 
             return self.value == other.value
 

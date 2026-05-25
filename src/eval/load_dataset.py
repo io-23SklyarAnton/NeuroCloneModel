@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from common.domain.value_objects import UserName
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage
 from ml_pipeline.domain.value_objects import DateUnixtime, ExportFileKey
 from ml_pipeline.infrastructure.in_memory.uow import InMemoryUnitOfWork
@@ -65,7 +66,7 @@ def load_irc_dataset_to_memory(
                 reply_to_message_id=None,
                 sequence_number=ParsedMessage.SequenceNumber(value=seq_num),
                 date_unixtime=DateUnixtime(value=int(msg_data["timestamp"])),
-                from_user=ParsedMessage.UserName(value=author_name),
+                from_user=UserName(value=author_name),
                 text=ParsedMessage.Text(value=clean_text),
                 chat_export_id=chat_id,
                 message_type=ParsedMessage.Type.TEXT,

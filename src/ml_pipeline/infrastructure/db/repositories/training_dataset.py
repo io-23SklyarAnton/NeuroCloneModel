@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from ml_pipeline.application.interfaces.repositories import ITrainingDatasetRepository
@@ -79,7 +79,7 @@ class TrainingDatasetRepository(
         return TrainingDatasetAggregate(
             id_=ID(value=db_model.id),
             owner_id=TrainingDatasetAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
-            target_user=TrainingDatasetAggregate.TargetUserName(value=db_model.target_user),
+            target_user=UserName(value=db_model.target_user),
             source_chat_export_ids=[
                 ChatExport.ChatID(value=chat_export_id)
                 for chat_export_id in db_model.source_chat_export_ids

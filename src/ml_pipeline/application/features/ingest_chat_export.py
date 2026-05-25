@@ -8,7 +8,7 @@ import json
 from typing import Iterator, Optional
 
 from common.application.base import ICommand
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from ml_pipeline.application.interfaces import IStorage, IUnitOfWork
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage
 from ml_pipeline.domain.value_objects import DateUnixtime, ExportFileKey
@@ -140,7 +140,7 @@ class CommandHandler:
             reply_to_message_id=self._resolve_reply(raw, external_id_map),
             sequence_number=ParsedMessage.SequenceNumber(value=sequence_number),
             date_unixtime=DateUnixtime(value=int(raw["date_unixtime"])),
-            from_user=ParsedMessage.UserName(value=from_user),
+            from_user=UserName(value=from_user),
             text=ParsedMessage.Text(value=text),
             chat_export_id=chat_export_id,
             message_type=message_type,

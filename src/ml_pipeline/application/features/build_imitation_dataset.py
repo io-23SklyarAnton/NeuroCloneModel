@@ -7,12 +7,13 @@ __all__ = [
 import json
 from io import BytesIO
 
+import jinja2
 import pydantic
 
 from common.application.base import ICommand, Response
+from common.domain.value_objects import UserName
 from ml_pipeline.application import constants
 from ml_pipeline.application.interfaces import IStorage, IUnitOfWork
-from ml_pipeline.application.services import ImitationContextFormatter
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage, TrainingDataset
 from ml_pipeline.domain.value_objects import DatasetFileKey
 from utils import get_now_datetime
@@ -21,7 +22,7 @@ from utils import get_now_datetime
 class Command(ICommand):
     chat_export_id: ChatExport.ChatID
     owner_id: TrainingDataset.OwnerTelegramID
-    target_user: TrainingDataset.TargetUserName
+    target_user: UserName
 
 
 class CommandHandler:
@@ -35,11 +36,16 @@ class CommandHandler:
             self,
             uow: IUnitOfWork,
             storage: IStorage,
-            context_formatter: ImitationContextFormatter,
     ) -> None:
         self._uow = uow
         self._storage = storage
-        self._context_formatter = context_formatter
+
+        template_loader = jinja2.FileSystemLoader(searchpath=constants.PROMPTS_DIR)
+        jinja_env = jinja2.Environment(
+            loader=template_loader,
+            autoescape=False,
+        )
+        self._template = jinja_env.get_template(constants.IMITATION_CONTEXT_TEMPLATE_NAME)
 
     async def handle(
             self,
@@ -78,7 +84,7 @@ class CommandHandler:
     async def _build_pairs(
             self,
             chat_export_id: ChatExport.ChatID,
-            target_user: TrainingDataset.TargetUserName,
+            target_user: UserName,
     ) -> list[ImitationPair]:
         threads = await self._uow.thread.get_all_by_chat_export_id(chat_export_id)
         pairs: list[CommandHandler.ImitationPair] = []
@@ -91,7 +97,7 @@ class CommandHandler:
     def _pairs_from_thread(
             self,
             messages: list[ParsedMessage],
-            target_user: TrainingDataset.TargetUserName,
+            target_user: UserName,
     ) -> list[ImitationPair]:
         pairs: list[CommandHandler.ImitationPair] = []
         context: list[ParsedMessage] = []
@@ -113,7 +119,7 @@ class CommandHandler:
     def _is_target_response(
             self,
             message: ParsedMessage,
-            target_user: TrainingDataset.TargetUserName,
+            target_user: UserName,
             context: list[ParsedMessage],
     ) -> bool:
         return (
@@ -136,14 +142,16 @@ class CommandHandler:
             self,
             messages: list[ParsedMessage],
     ) -> str:
-        formatter_messages: list[ImitationContextFormatter.Message] = [
-            ImitationContextFormatter.Message(
-                sender=message.from_user.value,
-                text=message.text.value,
-            )
-            for message in messages
+        window = messages[-constants.MAX_CONTEXT_MESSAGES_IMITATION:]
+        messages_data = [
+            {
+                "sender": msg.from_user.value,
+                "text": msg.text.value,
+            }
+            for msg in window
+
         ]
-        return self._context_formatter.format(formatter_messages)
+        return self._template.render(messages=messages_data)
 
     def _serialize_dataset(
             self,
@@ -166,14 +174,10 @@ class CommandHandler:
         return BytesIO("\n".join(lines).encode("utf-8"))
 
     @staticmethod
-    def _make_file_key(
-            chat_export_id: ChatExport.ChatID,
-    ) -> DatasetFileKey:
+    def _make_file_key(chat_export_id: ChatExport.ChatID) -> DatasetFileKey:
         timestamp: str = get_now_datetime().strftime("%Y%m%d_%H%M%S")
         return DatasetFileKey(value=f"{chat_export_id.value}_{timestamp}.jsonl")
 
     @staticmethod
-    def _build_system_prompt(
-            target_user: TrainingDataset.TargetUserName,
-    ) -> str:
+    def _build_system_prompt(target_user: UserName) -> str:
         return constants.IMITATION_SYSTEM_PROMPT.format(target_user=target_user.value)

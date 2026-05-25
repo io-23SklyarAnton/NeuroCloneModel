@@ -6,7 +6,7 @@ __all__ = [
 from pathlib import Path
 
 from common.application.base import ICommand
-from ml_pipeline.application.interfaces import IInferenceEngine
+from infrastructure.llm import IInferenceEngine
 
 
 class Command(ICommand):

@@ -33,6 +33,10 @@ class Bot(Base):
         String,
         nullable=False,
     )
+    target_user_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
     status: Mapped[BotAggregate.BotStatus] = mapped_column(
         Enum(BotAggregate.BotStatus, name="bot_status"),
         nullable=False,

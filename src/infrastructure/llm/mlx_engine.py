@@ -19,7 +19,7 @@ from mlx_lm.sample_utils import make_sampler
 from mlx_lm.tuner.utils import linear_to_lora_layers
 
 import constants
-from ml_pipeline.application.interfaces import IInferenceEngine
+from infrastructure.llm import IInferenceEngine
 
 
 MODEL_PATHS: dict[constants.AvailableModel, str] = {
