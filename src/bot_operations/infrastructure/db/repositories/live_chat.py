@@ -86,6 +86,7 @@ class LiveChatRepository(ILiveChatRepository, BaseRepository[LiveChatAggregate, 
             from_user=message.from_user.value,
             text=message.text.value,
             sent_at=message.sent_at.replace(tzinfo=None),
+            is_from_bot=message.is_from_bot,
         )
 
     @staticmethod
@@ -97,6 +98,7 @@ class LiveChatRepository(ILiveChatRepository, BaseRepository[LiveChatAggregate, 
             from_user=LiveMessage.UserName(value=db_model.from_user),
             text=LiveMessage.Text(value=db_model.text),
             sent_at=db_model.sent_at,
+            is_from_bot=db_model.is_from_bot,
         )
 
     def _filter_by_external_id(

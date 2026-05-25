@@ -32,11 +32,13 @@ class LiveMessage(Entity):
             from_user: UserName,
             text: Text,
             sent_at: datetime,
+            is_from_bot: bool,
     ):
         self._id = id_
         self._from_user = from_user
         self._text = text
         self._sent_at = sent_at
+        self._is_from_bot = is_from_bot
 
     @property
     def id(self) -> ID:
@@ -54,8 +56,12 @@ class LiveMessage(Entity):
     def sent_at(self) -> datetime:
         return self._sent_at
 
+    @property
+    def is_from_bot(self) -> bool:
+        return self._is_from_bot
+
     @classmethod
-    def create(
+    def create_user_message(
             cls,
             from_user: UserName,
             text: Text,
@@ -66,6 +72,22 @@ class LiveMessage(Entity):
             from_user=from_user,
             text=text,
             sent_at=sent_at,
+            is_from_bot=False,
+        )
+
+    @classmethod
+    def create_bot_message(
+            cls,
+            from_user: UserName,
+            text: Text,
+            sent_at: datetime,
+    ) -> "LiveMessage":
+        return cls(
+            id_=ID.create(),
+            from_user=from_user,
+            text=text,
+            sent_at=sent_at,
+            is_from_bot=True,
         )
 
 
@@ -125,3 +147,12 @@ class LiveChat(Aggregate):
             message: LiveMessage,
     ) -> None:
         self._recent_messages.append(message)
+
+    def count_messages_since_last_bot_reply(self) -> int:
+        count: int = 0
+        for message in reversed(self._recent_messages):
+            if message.is_from_bot:
+                break
+            count += 1
+
+        return count

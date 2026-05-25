@@ -80,6 +80,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 aggregate.lora_path.value
                 if aggregate.lora_path is not None else None
             ),
+            reply_period=aggregate.reply_period.value,
         )
 
     def from_db_model_to_aggregate(
@@ -100,6 +101,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 BotAggregate.LoraPath(value=db_model.lora_path)
                 if db_model.lora_path is not None else None
             ),
+            reply_period=BotAggregate.ReplyPeriod(value=db_model.reply_period),
         )
 
     def _filter_by_id(

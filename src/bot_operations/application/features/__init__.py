@@ -17,6 +17,10 @@ from bot_operations.application.features.run_bot import (
     Command as RunBotCommand,
     CommandHandler as RunBotCommandHandler,
 )
+from bot_operations.application.features.train_bot import (
+    Command as TrainBotCommand,
+    CommandHandler as TrainBotCommandHandler,
+)
 
 __all__ = [
     "CreateBotCommand",
@@ -30,4 +34,6 @@ __all__ = [
     "ReceiveChatMessageResponse",
     "RunBotCommand",
     "RunBotCommandHandler",
+    "TrainBotCommand",
+    "TrainBotCommandHandler",
 ]

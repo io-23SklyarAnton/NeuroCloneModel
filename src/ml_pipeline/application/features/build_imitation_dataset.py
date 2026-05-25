@@ -7,12 +7,12 @@ __all__ = [
 import json
 from io import BytesIO
 
-import jinja2
 import pydantic
 
-from ml_pipeline.application import constants
 from common.application.base import ICommand, Response
+from ml_pipeline.application import constants
 from ml_pipeline.application.interfaces import IStorage, IUnitOfWork
+from ml_pipeline.application.services import ImitationContextFormatter
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage, TrainingDataset
 from ml_pipeline.domain.value_objects import DatasetFileKey
 from utils import get_now_datetime
@@ -35,18 +35,16 @@ class CommandHandler:
             self,
             uow: IUnitOfWork,
             storage: IStorage,
+            context_formatter: ImitationContextFormatter,
     ) -> None:
         self._uow = uow
         self._storage = storage
+        self._context_formatter = context_formatter
 
-        template_loader = jinja2.FileSystemLoader(searchpath=constants.PROMPTS_DIR)
-        jinja_env = jinja2.Environment(
-            loader=template_loader,
-            autoescape=False,
-        )
-        self._template = jinja_env.get_template(constants.IMITATION_CONTEXT_TEMPLATE_NAME)
-
-    async def handle(self, command: Command) -> Response:
+    async def handle(
+            self,
+            command: Command,
+    ) -> Response:
         pairs: list[CommandHandler.ImitationPair] = await self._build_pairs(
             chat_export_id=command.chat_export_id,
             target_user=command.target_user,
@@ -54,7 +52,7 @@ class CommandHandler:
 
         system_prompt: str = self._build_system_prompt(command.target_user)
         file_key: DatasetFileKey = self._make_file_key(command.chat_export_id)
-        content = self._serialize_dataset(
+        content: BytesIO = self._serialize_dataset(
             dataset=pairs,
             system_prompt=system_prompt,
         )
@@ -64,7 +62,7 @@ class CommandHandler:
             file_name=str(file_key),
         )
 
-        dataset = TrainingDataset.create(
+        dataset: TrainingDataset = TrainingDataset.create(
             owner_id=command.owner_id,
             target_user=command.target_user,
             source_chat_export_ids=[command.chat_export_id],
@@ -134,23 +132,25 @@ class CommandHandler:
             expected_response=response.text.value,
         )
 
-    def _format_context(self, messages: list[ParsedMessage]) -> str:
-        window = messages[-constants.MAX_CONTEXT_MESSAGES_IMITATION:]
-        messages_data = [
-            {
-                "sender": msg.from_user.value,
-                "text": msg.text.value,
-            }
-            for msg in window
+    def _format_context(
+            self,
+            messages: list[ParsedMessage],
+    ) -> str:
+        formatter_messages: list[ImitationContextFormatter.Message] = [
+            ImitationContextFormatter.Message(
+                sender=message.from_user.value,
+                text=message.text.value,
+            )
+            for message in messages
         ]
-        return self._template.render(messages=messages_data)
+        return self._context_formatter.format(formatter_messages)
 
     def _serialize_dataset(
             self,
             dataset: list[ImitationPair],
             system_prompt: str,
     ) -> BytesIO:
-        lines = [
+        lines: list[str] = [
             json.dumps(
                 {
                     "messages": [
@@ -166,9 +166,14 @@ class CommandHandler:
         return BytesIO("\n".join(lines).encode("utf-8"))
 
     @staticmethod
-    def _make_file_key(chat_export_id: ChatExport.ChatID) -> DatasetFileKey:
-        timestamp = get_now_datetime().strftime("%Y%m%d_%H%M%S")
+    def _make_file_key(
+            chat_export_id: ChatExport.ChatID,
+    ) -> DatasetFileKey:
+        timestamp: str = get_now_datetime().strftime("%Y%m%d_%H%M%S")
         return DatasetFileKey(value=f"{chat_export_id.value}_{timestamp}.jsonl")
 
-    def _build_system_prompt(self, target_user: TrainingDataset.TargetUserName) -> str:
+    @staticmethod
+    def _build_system_prompt(
+            target_user: TrainingDataset.TargetUserName,
+    ) -> str:
         return constants.IMITATION_SYSTEM_PROMPT.format(target_user=target_user.value)

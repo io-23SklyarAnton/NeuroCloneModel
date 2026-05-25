@@ -6,7 +6,7 @@ import datetime
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +39,10 @@ class LiveMessage(Base):
     )
     sent_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=False),
+        nullable=False,
+    )
+    is_from_bot: Mapped[bool] = mapped_column(
+        Boolean,
         nullable=False,
     )
 

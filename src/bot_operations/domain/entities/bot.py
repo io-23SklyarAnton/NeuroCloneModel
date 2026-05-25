@@ -1,7 +1,9 @@
 __all__ = ["Bot"]
 
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Self
+
+from pydantic import model_validator
 
 from common.domain.entities import Aggregate
 from common.domain.value_objects import ID, ValueObject
@@ -62,6 +64,24 @@ class Bot(Aggregate):
         def __str__(self) -> str:
             return self.value
 
+    class ReplyPeriod(ValueObject):
+        value: int
+
+        def __eq__(self, other: object) -> bool:
+            assert isinstance(other, Bot.ReplyPeriod)
+
+            return self.value == other.value
+
+        def __hash__(self) -> int:
+            return hash(self.value)
+
+        @model_validator(mode='after')
+        def validate_value(self) -> Self:
+            if self.value < 1:
+                raise ValueError("Reply period must be at least 1.")
+
+            return self
+
     class IllegalStateTransitionError(RuntimeError):
         def __init__(
                 self,
@@ -87,6 +107,7 @@ class Bot(Aggregate):
             status: BotStatus,
             linked_dataset_ids: list[LinkedDatasetID],
             lora_path: Optional[LoraPath],
+            reply_period: Optional[ReplyPeriod],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -96,6 +117,7 @@ class Bot(Aggregate):
         self._status = status
         self._linked_dataset_ids = linked_dataset_ids
         self._lora_path = lora_path
+        self._reply_period = reply_period
 
     @property
     def id(self) -> ID:
@@ -126,6 +148,10 @@ class Bot(Aggregate):
         return self._lora_path
 
     @property
+    def reply_period(self) -> Optional[ReplyPeriod]:
+        return self._reply_period
+
+    @property
     def is_running(self) -> bool:
         return self._status == self.BotStatus.RUNNING
 
@@ -136,7 +162,6 @@ class Bot(Aggregate):
             token: Token,
             name: Name,
             linked_dataset_ids: list[LinkedDatasetID],
-            lora_path: Optional[LoraPath] = None,
     ) -> "Bot":
         bot = cls(
             id_=ID.create(),
@@ -145,7 +170,8 @@ class Bot(Aggregate):
             name=name,
             status=cls.BotStatus.PENDING,
             linked_dataset_ids=linked_dataset_ids,
-            lora_path=lora_path,
+            lora_path=None,
+            reply_period=None,
         )
         return bot
 
@@ -173,6 +199,12 @@ class Bot(Aggregate):
 
     def detach_lora(self) -> None:
         self._lora_path = None
+
+    def set_reply_period(
+            self,
+            reply_period: ReplyPeriod,
+    ) -> None:
+        self._reply_period = reply_period
 
     def start_bot(self) -> None:
         if self.is_running:

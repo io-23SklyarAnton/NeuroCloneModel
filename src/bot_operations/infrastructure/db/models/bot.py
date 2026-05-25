@@ -5,7 +5,7 @@ __all__ = [
 import uuid
 from typing import Optional
 
-from sqlalchemy import BigInteger, Enum, String, UniqueConstraint
+from sqlalchemy import BigInteger, Enum, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,6 +46,10 @@ class Bot(Base):
         String,
         nullable=True,
         default=None,
+    )
+    reply_period: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
     )
 
     __table_args__ = (
