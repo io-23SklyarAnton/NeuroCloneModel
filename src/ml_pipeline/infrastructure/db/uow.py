@@ -23,6 +23,7 @@ class SqlAlchemyUnitOfWork(IUnitOfWork):
         self.parsed_message = repositories.ParsedMessageRepository(self._session)
         self.thread = repositories.ThreadRepository(self._session)
         self.training_dataset = repositories.TrainingDatasetRepository(self._session)
+        self.neuroclone = repositories.NeuroCloneRepository(self._session)
 
         return self
 

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot as BotAggregate
 from bot_operations.infrastructure.db.models import Bot as DBBot
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 
@@ -71,16 +71,8 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_telegram_id=aggregate.owner_id.value,
             token=aggregate.token.value,
             name=aggregate.name.value,
-            target_user_name=aggregate.target_user_name.value,
+            neuroclone_id=aggregate.neuroclone_id.value,
             status=aggregate.status,
-            linked_dataset_ids=[
-                linked_dataset_id.value.value
-                for linked_dataset_id in aggregate.linked_dataset_ids
-            ],
-            lora_path=(
-                aggregate.lora_path.value
-                if aggregate.lora_path is not None else None
-            ),
             reply_period=(
                 aggregate.reply_period.value
                 if aggregate.reply_period is not None else None
@@ -96,16 +88,8 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_id=BotAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
             token=BotAggregate.Token(value=db_model.token),
             name=BotAggregate.Name(value=db_model.name),
-            target_user_name=UserName(value=db_model.target_user_name),
+            neuroclone_id=BotAggregate.NeuroCloneID(value=db_model.neuroclone_id),
             status=db_model.status,
-            linked_dataset_ids=[
-                BotAggregate.LinkedDatasetID(value=ID(value=linked_dataset_id))
-                for linked_dataset_id in db_model.linked_dataset_ids
-            ],
-            lora_path=(
-                BotAggregate.LoraPath(value=db_model.lora_path)
-                if db_model.lora_path is not None else None
-            ),
             reply_period=(
                 BotAggregate.ReplyPeriod(value=db_model.reply_period)
                 if db_model.reply_period is not None else None

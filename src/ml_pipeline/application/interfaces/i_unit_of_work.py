@@ -11,6 +11,7 @@ class IUnitOfWork(abc.ABC):
     parsed_message: repositories.IParsedMessageRepository
     thread: repositories.IThreadRepository
     training_dataset: repositories.ITrainingDatasetRepository
+    neuroclone: repositories.INeuroCloneRepository
 
     def __enter__(self) -> Self:
         raise NotImplementedError

@@ -1,15 +1,21 @@
 __all__ = ["InMemoryUnitOfWork"]
 
+from common.domain.entities import Aggregate
 from ml_pipeline.application.interfaces import IUnitOfWork
 from ml_pipeline.infrastructure.in_memory import repositories
 
 
 class InMemoryUnitOfWork(IUnitOfWork):
     def __init__(self) -> None:
+        self._outbox: list[Aggregate.IDomainEvent] = []
         self.chat_export = repositories.InMemoryChatExportRepository({})
         self.parsed_message = repositories.InMemoryParsedMessageRepository({})
         self.thread = repositories.InMemoryThreadRepository({})
         self.training_dataset = repositories.InMemoryTrainingDatasetRepository({})
+        self.neuroclone = repositories.InMemoryNeuroCloneRepository(
+            storage={},
+            outbox=self._outbox,
+        )
 
     def __enter__(self) -> "InMemoryUnitOfWork":
         return self
@@ -25,3 +31,7 @@ class InMemoryUnitOfWork(IUnitOfWork):
 
     async def rollback(self) -> None:
         pass
+
+    @property
+    def outbox(self) -> list[Aggregate.IDomainEvent]:
+        return self._outbox

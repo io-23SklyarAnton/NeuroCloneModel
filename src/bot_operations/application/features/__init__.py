@@ -1,7 +1,3 @@
-from bot_operations.application.features.attach_lora import (
-    Command as AttachLoraCommand,
-    CommandHandler as AttachLoraCommandHandler,
-)
 from bot_operations.application.features.create_bot import (
     Command as CreateBotCommand,
     CommandHandler as CreateBotCommandHandler,
@@ -23,8 +19,6 @@ from bot_operations.application.features.run_bot import (
 )
 
 __all__ = [
-    "AttachLoraCommand",
-    "AttachLoraCommandHandler",
     "CreateBotCommand",
     "CreateBotCommandHandler",
     "GetUserBotsBotView",

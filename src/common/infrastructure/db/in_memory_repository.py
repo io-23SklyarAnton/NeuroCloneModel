@@ -12,14 +12,17 @@ class InMemoryBaseRepository(IBaseRepository[T_Aggregate], Generic[T_Aggregate])
     def __init__(
             self,
             storage: dict[Any, T_Aggregate],
+            outbox: Optional[list[Aggregate.IDomainEvent]] = None,
     ):
         self._storage = storage
+        self._outbox: list[Aggregate.IDomainEvent] = outbox if outbox is not None else []
 
     def create(
             self,
             aggregate: T_Aggregate,
     ) -> None:
         self._storage[aggregate.id] = aggregate
+        self._drain_events(aggregate)
 
     def update(
             self,
@@ -29,6 +32,7 @@ class InMemoryBaseRepository(IBaseRepository[T_Aggregate], Generic[T_Aggregate])
             raise ValueError(f"Entity with id {aggregate.id} not found for update")
 
         self._storage[aggregate.id] = aggregate
+        self._drain_events(aggregate)
 
     def get_optional(
             self,
@@ -49,3 +53,13 @@ class InMemoryBaseRepository(IBaseRepository[T_Aggregate], Generic[T_Aggregate])
 
     def get_all(self) -> list[T_Aggregate]:
         return list(self._storage.values())
+
+    @property
+    def collected_events(self) -> list[Aggregate.IDomainEvent]:
+        return self._outbox
+
+    def _drain_events(
+            self,
+            aggregate: T_Aggregate,
+    ) -> None:
+        self._outbox.extend(aggregate.publish_events())

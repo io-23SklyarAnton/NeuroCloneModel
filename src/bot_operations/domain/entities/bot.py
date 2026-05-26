@@ -1,12 +1,13 @@
 __all__ = ["Bot"]
 
+import uuid
 from enum import StrEnum
 from typing import Optional, Self
 
 from pydantic import model_validator
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject, UserName
+from common.domain.value_objects import ID, ValueObject
 
 
 class Bot(Aggregate):
@@ -42,27 +43,19 @@ class Bot(Aggregate):
         def __hash__(self) -> int:
             return hash(self.value)
 
-    class LinkedDatasetID(ValueObject):
-        value: ID
+    class NeuroCloneID(ValueObject):
+        value: uuid.UUID
 
         def __eq__(self, other: object) -> bool:
-            assert isinstance(other, Bot.LinkedDatasetID)
+            assert isinstance(other, Bot.NeuroCloneID)
 
             return self.value == other.value
 
         def __hash__(self) -> int:
             return hash(self.value)
 
-    class LoraPath(ValueObject):
-        value: str
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, Bot.LoraPath)
-
-            return self.value == other.value
-
         def __str__(self) -> str:
-            return self.value
+            return str(self.value)
 
     class ReplyPeriod(ValueObject):
         value: int
@@ -98,27 +91,30 @@ class Bot(Aggregate):
         ) -> None:
             super().__init__(f"User {requester_id.value} is not the owner of bot {bot_id}")
 
+    class EventBotCreated(Aggregate.IDomainEvent):
+        class Payload(Aggregate.IDomainEvent.Payload):
+            bot_id: uuid.UUID
+            owner_telegram_id: int
+            neuroclone_id: uuid.UUID
+            bot_name: str
+
     def __init__(
             self,
             id_: ID,
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
-            target_user_name: UserName,
+            neuroclone_id: NeuroCloneID,
             status: BotStatus,
-            linked_dataset_ids: list[LinkedDatasetID],
-            lora_path: Optional[LoraPath],
-            reply_period: Optional[ReplyPeriod],
+            reply_period: Optional[ReplyPeriod],  # TODO: move to neuroclone
     ) -> None:
         super().__init__()
         self._id = id_
         self._owner_id = owner_id
         self._token = token
         self._name = name
-        self._target_user_name = target_user_name
+        self._neuroclone_id = neuroclone_id
         self._status = status
-        self._linked_dataset_ids = linked_dataset_ids
-        self._lora_path = lora_path
         self._reply_period = reply_period
 
     @property
@@ -138,20 +134,12 @@ class Bot(Aggregate):
         return self._name
 
     @property
-    def target_user_name(self) -> UserName:
-        return self._target_user_name
+    def neuroclone_id(self) -> NeuroCloneID:
+        return self._neuroclone_id
 
     @property
     def status(self) -> BotStatus:
         return self._status
-
-    @property
-    def linked_dataset_ids(self) -> list[LinkedDatasetID]:
-        return self._linked_dataset_ids
-
-    @property
-    def lora_path(self) -> Optional[LoraPath]:
-        return self._lora_path
 
     @property
     def reply_period(self) -> Optional[ReplyPeriod]:
@@ -167,36 +155,34 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
-            target_user_name: UserName,
-            linked_dataset_ids: list[LinkedDatasetID],
+            neuroclone_id: NeuroCloneID,
     ) -> "Bot":
-        bot = cls(
+        bot: "Bot" = cls(
             id_=ID.create(),
             owner_id=owner_id,
             token=token,
             name=name,
-            target_user_name=target_user_name,
+            neuroclone_id=neuroclone_id,
             status=cls.BotStatus.PENDING,
-            linked_dataset_ids=linked_dataset_ids,
-            lora_path=None,
             reply_period=None,
         )
+        bot._events_to_publish.append(cls.EventBotCreated(
+            object_id=str(bot.id.value),
+            payload=cls.EventBotCreated.Payload(
+                bot_id=bot.id.value,
+                owner_telegram_id=owner_id.value,
+                neuroclone_id=neuroclone_id.value,
+                bot_name=name.value,
+            ),
+        ))
         return bot
 
-    def link_dataset(
+    def ensure_owned_by(
             self,
-            dataset_id: LinkedDatasetID,
+            user_id: OwnerTelegramID,
     ) -> None:
-        if dataset_id in self._linked_dataset_ids:
-            return
-
-        self._linked_dataset_ids.append(dataset_id)
-
-    def attach_lora(
-            self,
-            lora_path: LoraPath,
-    ) -> None:
-        self._lora_path = lora_path
+        if not (self._owner_id == user_id):
+            raise Bot.NotOwnedError(bot_id=self._id, requester_id=user_id)
 
     def set_reply_period(
             self,
@@ -212,3 +198,12 @@ class Bot(Aggregate):
             )
 
         self._status = self.BotStatus.RUNNING
+
+    def stop_bot(self) -> None:
+        if not self.is_running:
+            raise Bot.IllegalStateTransitionError(
+                current=self._status,
+                requested=self.BotStatus.STOPPED,
+            )
+
+        self._status = self.BotStatus.STOPPED

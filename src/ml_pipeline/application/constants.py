@@ -4,6 +4,12 @@ PROMPTS_DIR = BASE_PATH / 'ml_pipeline' / 'infrastructure' / 'llm' / 'prompts'
 IMITATION_CONTEXT_TEMPLATE_NAME = 'imitation_context.jinja2'
 MAX_CONTEXT_MESSAGES_IMITATION = 15
 IMITATION_SYSTEM_PROMPT = "Act as {target_user}. Continue the chat history organically, preserving the exact language, typing style, and persona of {target_user}."
+
+PERSONA_REPLY_MAX_TOKENS = 256
+PERSONA_REPLY_TEMPERATURE = 0.3
+PERSONA_REPLY_PRIORITY = 1
+PERSONA_REPLY_CONTEXT_WINDOW = 15
+
 W_PREV = 60
 W_SUB = 10
 W_AGG = 10

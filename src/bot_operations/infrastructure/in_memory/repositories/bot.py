@@ -4,6 +4,7 @@ from typing import Optional
 
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot
+from common.domain.entities import Aggregate
 from common.domain.value_objects import ID
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 
@@ -12,8 +13,9 @@ class InMemoryBotRepository(InMemoryBaseRepository[Bot], IBotRepository):
     def __init__(
             self,
             storage: dict[ID, Bot],
+            outbox: Optional[list[Aggregate.IDomainEvent]] = None,
     ):
-        super().__init__(storage)
+        super().__init__(storage=storage, outbox=outbox)
 
     async def get_by_id_or_raise(self, bot_id: ID) -> Bot:
         return self.get_or_raise(bot_id)

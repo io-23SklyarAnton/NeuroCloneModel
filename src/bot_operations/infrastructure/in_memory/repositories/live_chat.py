@@ -4,6 +4,7 @@ from typing import Optional
 
 from bot_operations.application.interfaces.repositories import ILiveChatRepository
 from bot_operations.domain.entities import LiveChat
+from common.domain.entities import Aggregate
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 
 
@@ -11,8 +12,9 @@ class InMemoryLiveChatRepository(InMemoryBaseRepository[LiveChat], ILiveChatRepo
     def __init__(
             self,
             storage: dict[LiveChat.ExternalID, LiveChat],
+            outbox: Optional[list[Aggregate.IDomainEvent]] = None,
     ):
-        super().__init__(storage)
+        super().__init__(storage=storage, outbox=outbox)
 
     async def get_by_id_or_raise(
             self,

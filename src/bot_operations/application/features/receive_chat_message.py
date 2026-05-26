@@ -7,21 +7,23 @@ __all__ = [
 import random
 from typing import Optional
 
-import jinja2
 import pydantic
 
-from bot_operations.application import constants
-from bot_operations.application.interfaces import IUnitOfWork
+from bot_operations.application.interfaces import (
+    ChatContextMessage,
+    IUnitOfWork,
+    PersonaReplyService,
+)
 from bot_operations.domain.entities import Bot, LiveChat, LiveMessage
 from common.application.base import ICommand
 from common.domain.value_objects import ID, UserName
-from infrastructure.llm import IInferenceEngine
 from utils import get_now_datetime
 
 
 class Command(ICommand):
     bot_id: ID
     chat_external_id: LiveChat.ExternalID
+    user_name: UserName
     text: LiveMessage.Text
 
 
@@ -33,17 +35,10 @@ class CommandHandler:
     def __init__(
             self,
             uow: IUnitOfWork,
-            inference_engine: IInferenceEngine,
+            persona_reply_service: PersonaReplyService,
     ) -> None:
         self._uow = uow
-        self._inference_engine = inference_engine
-
-        loader: jinja2.FileSystemLoader = jinja2.FileSystemLoader(searchpath=str(constants.PROMPTS_DIR))
-        env: jinja2.Environment = jinja2.Environment(
-            loader=loader,
-            autoescape=False,
-        )
-        self._template: jinja2.Template = env.get_template(constants.REPLY_CONTEXT_TEMPLATE_NAME)
+        self._persona_reply_service = persona_reply_service
 
     async def handle(
             self,
@@ -71,18 +66,22 @@ class CommandHandler:
             await self._uow.commit()
             return Response(reply_text=None)
 
-        if bot.lora_path is None:
-            print(f"ERROR: Bot {bot.id.value} is configured to reply, but has no LoRA path set. Skipping reply.")
+        generated_text: Optional[str] = await self._persona_reply_service.generate_reply(
+            neuroclone_id=bot.neuroclone_id.value,
+            context=[
+                ChatContextMessage(
+                    sender=message.from_user.value,
+                    text=message.text.value,
+                )
+                for message in live_chat.recent_messages
+            ],
+        )
+        if generated_text is None:
+            await self._uow.commit()
             return Response(reply_text=None)
 
-        generated_text: str = await self._generate_reply(
-            recent_messages=live_chat.recent_messages,
-            target_user_name=bot.target_user_name,
-            lora_path=bot.lora_path,
-        )
-
         bot_message: LiveMessage = LiveMessage.create_bot_message(
-            from_user=bot.target_user_name,
+            from_user=UserName(value=bot.name.value),
             text=LiveMessage.Text(value=generated_text),
             sent_at=get_now_datetime(),
         )
@@ -116,7 +115,6 @@ class CommandHandler:
             live_chat: LiveChat,
     ) -> bool:
         if bot.reply_period is None:
-            print(f"ERROR: Bot {bot.id.value} has no reply period set, but received a message. Skipping reply.")
             return False
 
         messages_since_last_reply: int = live_chat.count_messages_since_last_bot_reply()
@@ -125,38 +123,3 @@ class CommandHandler:
 
         geometric_trial_probability: float = 1.0 / bot.reply_period.value
         return random.random() < geometric_trial_probability
-
-    async def _generate_reply(
-            self,
-            recent_messages: list[LiveMessage],
-            target_user_name: UserName,
-            lora_path: Optional[Bot.LoraPath],
-    ) -> str:
-        user_prompt: str = self._build_user_prompt(recent_messages)
-        system_prompt: str = constants.REPLY_SYSTEM_PROMPT.format(
-            target_user=target_user_name.value,
-        )
-
-        return await self._inference_engine.generate_async(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            lora_path=lora_path.value,
-            max_tokens=constants.REPLY_MAX_TOKENS,
-            temp=constants.REPLY_TEMPERATURE,
-            priority=constants.REPLY_PRIORITY,
-        )
-
-    def _build_user_prompt(
-            self,
-            messages: list[LiveMessage],
-    ) -> str:
-        window = messages[-constants.CONTEXT_WINDOW_MESSAGES:]
-        messages_data = [
-            {
-                "sender": msg.from_user.value,
-                "text": msg.text.value,
-            }
-            for msg in window
-
-        ]
-        return self._template.render(messages=messages_data)

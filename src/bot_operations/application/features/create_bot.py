@@ -10,15 +10,13 @@ from bot_operations.application import constants
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand, Response
-from common.domain.value_objects import UserName
 
 
 class Command(ICommand):
     owner_id: Bot.OwnerTelegramID
     bot_name: Bot.Name
     bot_token: Bot.Token
-    target_user_name: UserName
-    linked_dataset_ids: list[Bot.LinkedDatasetID]
+    neuroclone_id: Bot.NeuroCloneID
 
 
 class CommandHandler:
@@ -36,7 +34,7 @@ class CommandHandler:
         if existing_bot is not None:
             return Response(message="Bot with this token already exists.")
 
-        owner_bots = await self._uow.bot.get_by_owner_id(command.owner_id)
+        owner_bots: list[Bot] = await self._uow.bot.get_by_owner_id(command.owner_id)
         if len(owner_bots) >= constants.USER_BOT_LIMIT:
             return Response(message=f"You have reached the maximum number of bots ({constants.USER_BOT_LIMIT}).")
 
@@ -44,8 +42,7 @@ class CommandHandler:
             owner_id=command.owner_id,
             token=command.bot_token,
             name=command.bot_name,
-            target_user_name=command.target_user_name,
-            linked_dataset_ids=command.linked_dataset_ids,
+            neuroclone_id=command.neuroclone_id,
         )
         self._uow.bot.create(bot)
         await self._uow.commit()
