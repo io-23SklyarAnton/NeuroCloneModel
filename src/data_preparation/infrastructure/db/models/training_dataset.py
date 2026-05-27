@@ -28,8 +28,8 @@ class TrainingDataset(Base):
         String,
         nullable=False,
     )
-    source_chat_export_ids: Mapped[list[int]] = mapped_column(
-        ARRAY(BigInteger),
+    source_chat_export_id: Mapped[int] = mapped_column(
+        Integer,
         nullable=False,
     )
     file_key: Mapped[str] = mapped_column(

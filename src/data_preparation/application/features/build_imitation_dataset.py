@@ -21,8 +21,6 @@ from utils import get_now_datetime
 
 class Command(ICommand):
     chat_export_id: ChatExport.ChatID
-    owner_id: TrainingDataset.OwnerTelegramID
-    target_user: UserName
 
 
 class CommandHandler:
@@ -51,9 +49,11 @@ class CommandHandler:
             self,
             command: Command,
     ) -> Response:
+        chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
+
         pairs: list[CommandHandler.ImitationPair] = await self._build_pairs(
-            chat_export_id=command.chat_export_id,
-            target_user=command.target_user,
+            chat_export_id=chat_export.id,
+            target_user=chat_export.target_user_name,
         )
 
         system_prompt: str = self._build_system_prompt(command.target_user)
@@ -69,9 +69,9 @@ class CommandHandler:
         )
 
         dataset: TrainingDataset = TrainingDataset.create(
-            owner_id=command.owner_id,
-            target_user=command.target_user,
-            source_chat_export_ids=[command.chat_export_id],
+            owner_id=chat_export.owner_id,
+            target_user=chat_export.target_user_name,
+            source_chat_export_id=chat_export.id,
             file_key=file_key,
             n_pairs=len(pairs),
             built_at=get_now_datetime(),

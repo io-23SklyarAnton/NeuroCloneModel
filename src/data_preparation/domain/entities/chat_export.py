@@ -3,14 +3,14 @@ __all__ = ["ChatExport"]
 from enum import StrEnum
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ValueObject
+from common.domain.value_objects import ValueObject, UserName
 from data_preparation.domain.value_objects import ExportFileKey
 
 
 class ChatExport(Aggregate):
     class Status(StrEnum):
         PENDING = "PENDING"
-        DISENTANGLING = "DISENTANGLING"
+        INGESTED = "INGESTED"
         READY = "READY"
         FAILED = "FAILED"
 
@@ -48,10 +48,23 @@ class ChatExport(Aggregate):
         class Payload(Aggregate.IDomainEvent.Payload):
             export_file_key: ExportFileKey
 
+    class EventChatExportIngested(Aggregate.IDomainEvent):
+        class Payload(Aggregate.IDomainEvent.Payload):
+            pass
+
+    class EventChatExportReady(Aggregate.IDomainEvent):
+        class Payload(Aggregate.IDomainEvent.Payload):
+            pass
+
+    class EventChatExportFailed(Aggregate.IDomainEvent):
+        class Payload(Aggregate.IDomainEvent.Payload):
+            pass
+
     def __init__(
             self,
             chat_id: ChatID,
             owner_id: OwnerTelegramID,
+            target_user_name: UserName,
             export_file_key: ExportFileKey,
             status: Status,
             n_messages: int,
@@ -59,6 +72,7 @@ class ChatExport(Aggregate):
         super().__init__()
         self._chat_id = chat_id
         self._owner_id = owner_id
+        self._target_user_name = target_user_name
         self._export_file_key = export_file_key
         self._status = status
         self._n_messages = n_messages
@@ -74,6 +88,10 @@ class ChatExport(Aggregate):
     @property
     def owner_id(self) -> OwnerTelegramID:
         return self._owner_id
+
+    @property
+    def target_user_name(self) -> UserName:
+        return self._target_user_name
 
     @property
     def export_file_key(self) -> ExportFileKey:
@@ -92,11 +110,13 @@ class ChatExport(Aggregate):
             cls,
             chat_id: ChatID,
             owner_id: OwnerTelegramID,
+            target_user_name: UserName,
             export_file_key: ExportFileKey,
     ) -> "ChatExport":
         chat_export = cls(
             chat_id=chat_id,
             owner_id=owner_id,
+            target_user_name=target_user_name,
             export_file_key=export_file_key,
             status=cls.Status.PENDING,
             n_messages=0,
@@ -115,23 +135,33 @@ class ChatExport(Aggregate):
     ) -> None:
         self._n_messages = n_messages
 
-    def mark_disentangling(self) -> None:
+    def mark_ingested(self) -> None:
         if self._status != self.Status.PENDING:
             raise ChatExport.IllegalStateTransitionError(
                 current=self._status,
-                requested=self.Status.DISENTANGLING,
+                requested=self.Status.INGESTED,
             )
+        self._status = self.Status.INGESTED
 
-        self._status = self.Status.DISENTANGLING
+        self._events_to_publish.append(ChatExport.EventChatExportIngested(
+            object_id=str(self._chat_id.value),
+        ))
 
     def mark_ready(self) -> None:
-        if self._status != self.Status.DISENTANGLING:
+        if self._status != self.Status.INGESTED:
             raise ChatExport.IllegalStateTransitionError(
                 current=self._status,
                 requested=self.Status.READY,
             )
-
         self._status = self.Status.READY
+
+        self._events_to_publish.append(ChatExport.EventChatExportReady(
+            object_id=str(self._chat_id.value),
+        ))
 
     def mark_failed(self) -> None:
         self._status = self.Status.FAILED
+
+        self._events_to_publish.append(ChatExport.EventChatExportFailed(
+            object_id=str(self._chat_id.value),
+        ))

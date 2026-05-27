@@ -18,7 +18,7 @@ _PERSIST_BATCH_SIZE = 1000
 
 
 class Command(ICommand):
-    export_file_key: ExportFileKey
+    chat_export_id: ChatExport.ChatID
 
 
 class CommandHandler:
@@ -43,13 +43,11 @@ class CommandHandler:
             self,
             command: Command,
     ) -> None:
+        chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
         raw_bytes = await self._storage.load(
-            file_name=command.export_file_key.value,
+            file_name=chat_export.export_file_key.value,
         )
         data = json.loads(raw_bytes)
-
-        chat_id = ChatExport.ChatID(value=int(data["id"]))
-        chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(chat_id)
 
         total_persisted = await self._persist_messages_in_batches(
             raw_messages=data["messages"],
@@ -57,6 +55,7 @@ class CommandHandler:
         )
 
         chat_export.record_message_count(total_persisted)
+        chat_export.mark_ingested()
         self._uow.chat_export.update(chat_export)
         await self._uow.commit()
 

@@ -23,7 +23,6 @@ class TrainingDataset(Aggregate):
 
     class EventDatasetBuilt(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):
-            dataset_id: uuid.UUID
             owner_telegram_id: int
             target_user_name: str
             dataset_file_key: str
@@ -35,7 +34,7 @@ class TrainingDataset(Aggregate):
             id_: ID,
             owner_id: OwnerTelegramID,
             target_user: UserName,
-            source_chat_export_ids: list[ChatExport.ChatID],
+            source_chat_export_id: ChatExport.ChatID,
             file_key: DatasetFileKey,
             n_pairs: int,
             built_at: datetime,
@@ -44,7 +43,7 @@ class TrainingDataset(Aggregate):
         self._id = id_
         self._owner_id = owner_id
         self._target_user = target_user
-        self._source_chat_export_ids = source_chat_export_ids
+        self._source_chat_export_id = source_chat_export_id
         self._file_key = file_key
         self._n_pairs = n_pairs
         self._built_at = built_at
@@ -62,8 +61,8 @@ class TrainingDataset(Aggregate):
         return self._target_user
 
     @property
-    def source_chat_export_ids(self) -> list[ChatExport.ChatID]:
-        return self._source_chat_export_ids
+    def source_chat_export_id(self) -> ChatExport.ChatID:
+        return self._source_chat_export_id
 
     @property
     def file_key(self) -> DatasetFileKey:
@@ -82,7 +81,7 @@ class TrainingDataset(Aggregate):
             cls,
             owner_id: OwnerTelegramID,
             target_user: UserName,
-            source_chat_export_ids: list[ChatExport.ChatID],
+            source_chat_export_id: ChatExport.ChatID,
             file_key: DatasetFileKey,
             n_pairs: int,
             built_at: datetime,
@@ -91,22 +90,18 @@ class TrainingDataset(Aggregate):
             id_=ID.create(),
             owner_id=owner_id,
             target_user=target_user,
-            source_chat_export_ids=source_chat_export_ids,
+            source_chat_export_id=source_chat_export_id,
             file_key=file_key,
             n_pairs=n_pairs,
             built_at=built_at,
         )
-        primary_chat_export_id: int = (
-            source_chat_export_ids[0].value if source_chat_export_ids else 0
-        )
         dataset._events_to_publish.append(cls.EventDatasetBuilt(
             object_id=str(dataset.id.value),
             payload=cls.EventDatasetBuilt.Payload(
-                dataset_id=dataset.id.value,
                 owner_telegram_id=owner_id.value,
                 target_user_name=target_user.value,
                 dataset_file_key=file_key.value,
-                source_chat_export_id=primary_chat_export_id,
+                source_chat_export_id=source_chat_export_id.value,
                 n_pairs=n_pairs,
             ),
         ))

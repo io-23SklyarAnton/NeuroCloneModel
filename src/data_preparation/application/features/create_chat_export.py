@@ -11,6 +11,7 @@ from typing import Optional
 import pydantic
 
 from common.application.base import ICommand
+from common.domain.value_objects import UserName
 from data_preparation.application.interfaces import IStorage, IUnitOfWork
 from data_preparation.domain.entities import ChatExport
 from data_preparation.domain.value_objects import ExportFileKey
@@ -20,6 +21,7 @@ class Command(ICommand):
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
     owner_id: ChatExport.OwnerTelegramID
+    target_user_name: UserName
     file_bytes: BytesIO
 
 
@@ -68,6 +70,7 @@ class CommandHandler:
         chat_export: ChatExport = ChatExport.create(
             chat_id=chat_id,
             owner_id=command.owner_id,
+            target_user_name=command.target_user_name,
             export_file_key=export_file_key,
         )
         self._uow.chat_export.create(chat_export)

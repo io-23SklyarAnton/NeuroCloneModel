@@ -7,7 +7,7 @@ from typing import Optional, Self
 from pydantic import model_validator
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, ValueObject
+from common.domain.value_objects import ID, ValueObject
 
 
 class Bot(Aggregate):
@@ -102,7 +102,6 @@ class Bot(Aggregate):
         class Payload(Aggregate.IDomainEvent.Payload):
             bot_id: uuid.UUID
             owner_telegram_id: int
-            target_user_name: str
             bot_name: str
 
     def __init__(
@@ -111,7 +110,6 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
-            target_user_name: UserName,
             status: BotStatus,
             neuroclone_id: Optional[NeuroCloneID],
             is_neuroclone_ready: bool,
@@ -122,7 +120,6 @@ class Bot(Aggregate):
         self._owner_id = owner_id
         self._token = token
         self._name = name
-        self._target_user_name = target_user_name
         self._status = status
         self._neuroclone_id = neuroclone_id
         self._is_neuroclone_ready = is_neuroclone_ready
@@ -143,10 +140,6 @@ class Bot(Aggregate):
     @property
     def name(self) -> Name:
         return self._name
-
-    @property
-    def target_user_name(self) -> UserName:
-        return self._target_user_name
 
     @property
     def status(self) -> BotStatus:
@@ -174,14 +167,12 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
-            target_user_name: UserName,
     ) -> "Bot":
         bot: "Bot" = cls(
             id_=ID.create(),
             owner_id=owner_id,
             token=token,
             name=name,
-            target_user_name=target_user_name,
             status=cls.BotStatus.PENDING,
             neuroclone_id=None,
             is_neuroclone_ready=False,
@@ -192,7 +183,6 @@ class Bot(Aggregate):
             payload=cls.EventBotCreated.Payload(
                 bot_id=bot.id.value,
                 owner_telegram_id=owner_id.value,
-                target_user_name=target_user_name.value,
                 bot_name=name.value,
             ),
         ))

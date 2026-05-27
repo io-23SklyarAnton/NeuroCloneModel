@@ -20,10 +20,3 @@ class IBotRepository(IBaseRepository[Bot]):
 
     @abc.abstractmethod
     async def get_by_owner_id(self, owner_id: Bot.OwnerTelegramID) -> list[Bot]: ...
-
-    @abc.abstractmethod
-    async def get_by_owner_and_target_user(
-            self,
-            owner_id: Bot.OwnerTelegramID,
-            target_user_name: UserName,
-    ) -> list[Bot]: ...

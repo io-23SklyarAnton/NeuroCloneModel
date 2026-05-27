@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
+from common.domain.value_objects import UserName
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from data_preparation.application.interfaces.repositories import IChatExportRepository
@@ -47,6 +48,7 @@ class ChatExportRepository(IChatExportRepository, BaseRepository[ChatExportAggre
         return DBChatExport(
             chat_id=aggregate.chat_id.value,
             owner_telegram_id=aggregate.owner_id.value,
+            target_user_name=aggregate.target_user_name.value,
             export_file_key=aggregate.export_file_key.value,
             status=aggregate.status,
             n_messages=aggregate.n_messages,
@@ -59,6 +61,7 @@ class ChatExportRepository(IChatExportRepository, BaseRepository[ChatExportAggre
         return ChatExportAggregate(
             chat_id=ChatExportAggregate.ChatID(value=db_model.chat_id),
             owner_id=ChatExportAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
+            target_user_name=UserName(value=db_model.target_user_name),
             export_file_key=ExportFileKey(value=db_model.export_file_key),
             status=db_model.status,
             n_messages=db_model.n_messages,

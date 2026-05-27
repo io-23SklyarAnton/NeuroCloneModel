@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot as BotAggregate
 from bot_operations.infrastructure.db.models import Bot as DBBot
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 
@@ -62,19 +62,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
         db_bots: list[DBBot] = query.all()
         return self.get_all(db_bots)
 
-    async def get_by_owner_and_target_user(
-            self,
-            owner_id: BotAggregate.OwnerTelegramID,
-            target_user_name: UserName,
-    ) -> list[BotAggregate]:
-        query: Query = self.base_query()
-
-        query = self._filter_by_owner_id(query, owner_id)
-        query = query.filter(self.model.target_user_name == target_user_name.value)
-
-        db_bots: list[DBBot] = query.all()
-        return self.get_all(db_bots)
-
     def from_aggregate_to_db_model(
             self,
             aggregate: BotAggregate,
@@ -84,7 +71,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_telegram_id=aggregate.owner_id.value,
             token=aggregate.token.value,
             name=aggregate.name.value,
-            target_user_name=aggregate.target_user_name.value,
             neuroclone_id=(
                 aggregate.neuroclone_id.value
                 if aggregate.neuroclone_id is not None else None
@@ -106,7 +92,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_id=BotAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
             token=BotAggregate.Token(value=db_model.token),
             name=BotAggregate.Name(value=db_model.name),
-            target_user_name=UserName(value=db_model.target_user_name),
             neuroclone_id=(
                 BotAggregate.NeuroCloneID(value=db_model.neuroclone_id)
                 if db_model.neuroclone_id is not None else None

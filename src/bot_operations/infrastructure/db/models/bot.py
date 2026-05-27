@@ -33,11 +33,6 @@ class Bot(Base):
         String,
         nullable=False,
     )
-    target_user_name: Mapped[str] = mapped_column(
-        String,
-        nullable=False,
-        index=True,
-    )
     neuroclone_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         nullable=True,

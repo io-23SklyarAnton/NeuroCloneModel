@@ -22,6 +22,10 @@ class ChatExport(Base):
         nullable=False,
         index=True,
     )
+    target_user_name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
     export_file_key: Mapped[str] = mapped_column(
         String,
         nullable=False,

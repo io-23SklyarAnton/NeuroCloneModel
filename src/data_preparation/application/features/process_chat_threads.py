@@ -76,7 +76,6 @@ class CommandHandler:
 
     async def handle(self, command: Command) -> None:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
-        chat_export.mark_disentangling()
 
         for offset in range(0, chat_export.n_messages, _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
             await self._process_batch(

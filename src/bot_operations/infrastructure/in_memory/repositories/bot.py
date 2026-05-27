@@ -5,7 +5,7 @@ from typing import Optional
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 
 
@@ -32,13 +32,3 @@ class InMemoryBotRepository(InMemoryBaseRepository[Bot], IBotRepository):
 
     async def get_by_owner_id(self, owner_id: Bot.OwnerTelegramID) -> list[Bot]:
         return [bot for bot in self._storage.values() if bot.owner_id == owner_id]
-
-    async def get_by_owner_and_target_user(
-            self,
-            owner_id: Bot.OwnerTelegramID,
-            target_user_name: UserName,
-    ) -> list[Bot]:
-        return [
-            bot for bot in self._storage.values()
-            if bot.owner_id == owner_id and bot.target_user_name == target_user_name
-        ]
