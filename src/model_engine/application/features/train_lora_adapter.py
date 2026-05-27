@@ -49,7 +49,8 @@ class CommandHandler:
                 message=f"NeuroClone {neuroclone.id.value} training failed: {exc}",
             )
 
-        neuroclone.mark_ready(NeuroClone.AdapterPath(value=str(adapter_path)))
+        neuroclone.set_adapter_path(NeuroClone.AdapterPath(value=str(adapter_path)))
+        neuroclone.mark_ready()
         self._uow.neuroclone.update(neuroclone)
         await self._uow.commit()
 

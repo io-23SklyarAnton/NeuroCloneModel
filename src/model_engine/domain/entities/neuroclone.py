@@ -131,18 +131,29 @@ class NeuroClone(Aggregate):
 
         self._status = self.Status.TRAINING
 
-    def mark_ready(
+    def set_adapter_path(
             self,
             adapter_path: AdapterPath,
     ) -> None:
+        if self._status != self.Status.TRAINING:
+            raise NeuroClone.IllegalStateTransitionError(
+                current=self._status,
+                requested=self.Status.TRAINING,
+            )
+
+        if self._adapter_path is not None:
+            raise RuntimeError(
+                f"Adapter path is already set for NeuroClone {self._id.value}: {self._adapter_path.value}",
+            )
+        self._adapter_path = adapter_path
+
+    def mark_ready(self) -> None:
         if self._status not in {self.Status.PREPARING, self.Status.TRAINING}:
             raise NeuroClone.IllegalStateTransitionError(
                 current=self._status,
                 requested=self.Status.READY,
             )
-
         self._status = self.Status.READY
-        self._adapter_path = adapter_path
 
         self._events_to_publish.append(NeuroClone.EventNeuroCloneReady(
             object_id=str(self._id.value),
