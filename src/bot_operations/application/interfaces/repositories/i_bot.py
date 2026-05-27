@@ -20,3 +20,6 @@ class IBotRepository(IBaseRepository[Bot]):
 
     @abc.abstractmethod
     async def get_by_owner_id(self, owner_id: OwnerTelegramID) -> list[Bot]: ...
+
+    @abc.abstractmethod
+    async def get_by_owner_id_without_neuroclone(self, owner_id: OwnerTelegramID) -> Optional[Bot]: ...

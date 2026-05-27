@@ -62,6 +62,18 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
         db_bots: list[DBBot] = query.all()
         return self.get_all(db_bots)
 
+    async def get_by_owner_id_without_neuroclone(
+            self,
+            owner_id: OwnerTelegramID,
+    ) -> Optional[BotAggregate]:
+        query: Query = self.base_query()
+
+        query = self._filter_by_owner_id(query, owner_id)
+        query = self._filter_without_neuroclone(query)
+
+        db_bot: Optional[DBBot] = query.first()
+        return self.get_optional(db_bot)
+
     def from_aggregate_to_db_model(
             self,
             aggregate: BotAggregate,
@@ -88,7 +100,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             token=BotAggregate.Token(value=db_model.token),
             name=BotAggregate.Name(value=db_model.name),
             neuroclone_id=(
-                BotAggregate.NeuroCloneID(value=db_model.neuroclone_id)
+                ID(value=db_model.neuroclone_id)
                 if db_model.neuroclone_id is not None else None
             ),
             status=db_model.status,
@@ -114,3 +126,9 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             owner_id: OwnerTelegramID,
     ) -> Query:
         return query.filter(self.model.owner_telegram_id == owner_id.value)
+
+    def _filter_without_neuroclone(
+            self,
+            query: Query,
+    ) -> Query:
+        return query.filter(self.model.neuroclone_id.is_(None))

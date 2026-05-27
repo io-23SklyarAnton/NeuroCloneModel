@@ -30,20 +30,6 @@ class Bot(Aggregate):
 
             return self.value == other.value
 
-    class NeuroCloneID(ValueObject):
-        value: uuid.UUID
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, Bot.NeuroCloneID)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
-
-        def __str__(self) -> str:
-            return str(self.value)
-
     class IllegalStateTransitionError(RuntimeError):
         def __init__(
                 self,
@@ -73,6 +59,9 @@ class Bot(Aggregate):
             owner_telegram_id: int
             bot_name: str
 
+    class NeuroCloneAssigned(Aggregate.IDomainEvent):
+        ...
+
     def __init__(
             self,
             id_: ID,
@@ -80,7 +69,7 @@ class Bot(Aggregate):
             token: Token,
             name: Name,
             status: BotStatus,
-            neuroclone_id: Optional[NeuroCloneID],
+            neuroclone_id: Optional[ID],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -111,7 +100,7 @@ class Bot(Aggregate):
         return self._status
 
     @property
-    def neuroclone_id(self) -> Optional[NeuroCloneID]:
+    def neuroclone_id(self) -> Optional[ID]:
         return self._neuroclone_id
 
     @property
@@ -150,11 +139,17 @@ class Bot(Aggregate):
         if not (self._owner_id == user_id):
             raise Bot.NotOwnedError(bot_id=self._id, requester_id=user_id)
 
-    def bind_neuroclone(
+    def assign_neuroclone(
             self,
-            neuroclone_id: NeuroCloneID,
+            neuroclone_id: ID,
     ) -> None:
+        if self._neuroclone_id is not None:
+            raise RuntimeError(f"Bot {self._id} already has a neuroclone assigned.")
         self._neuroclone_id = neuroclone_id
+
+        self._events_to_publish.append(Bot.NeuroCloneAssigned(
+            object_id=str(self._id.value),
+        ))
 
     def start_bot(self) -> None:
         if self._neuroclone_id is None:

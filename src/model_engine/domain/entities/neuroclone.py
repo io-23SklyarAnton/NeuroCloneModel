@@ -71,7 +71,10 @@ class NeuroClone(Aggregate):
         ...
 
     class EventNeuroCloneReady(Aggregate.IDomainEvent):
-        ...
+        class Payload(Aggregate.IDomainEvent.Payload):
+            owner_telegram_id: OwnerTelegramID
+
+        payload: Payload
 
     class EventNeuroCloneFailed(Aggregate.IDomainEvent):
         ...
@@ -184,6 +187,9 @@ class NeuroClone(Aggregate):
 
         self._events_to_publish.append(NeuroClone.EventNeuroCloneReady(
             object_id=str(self._id.value),
+            payload=NeuroClone.EventNeuroCloneReady.Payload(
+                owner_telegram_id=self._owner_id,
+            ),
         ))
 
     def mark_failed(self) -> None:
