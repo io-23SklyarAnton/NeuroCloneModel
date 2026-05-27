@@ -7,7 +7,7 @@ from typing import Optional, Self
 from pydantic import model_validator
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject
+from common.domain.value_objects import ID, UserName, ValueObject
 
 
 class Bot(Aggregate):
@@ -83,6 +83,13 @@ class Bot(Aggregate):
         ) -> None:
             super().__init__(f"Illegal bot status transition: {current.value} -> {requested.value}")
 
+    class NeuroCloneNotReadyError(RuntimeError):
+        def __init__(
+                self,
+                bot_id: ID,
+        ) -> None:
+            super().__init__(f"Bot {bot_id} cannot start: its neuroclone is not ready yet.")
+
     class NotOwnedError(RuntimeError):
         def __init__(
                 self,
@@ -95,7 +102,7 @@ class Bot(Aggregate):
         class Payload(Aggregate.IDomainEvent.Payload):
             bot_id: uuid.UUID
             owner_telegram_id: int
-            neuroclone_id: uuid.UUID
+            target_user_name: str
             bot_name: str
 
     def __init__(
@@ -104,17 +111,21 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
-            neuroclone_id: NeuroCloneID,
+            target_user_name: UserName,
             status: BotStatus,
-            reply_period: Optional[ReplyPeriod],  # TODO: move to neuroclone
+            neuroclone_id: Optional[NeuroCloneID],
+            is_neuroclone_ready: bool,
+            reply_period: Optional[ReplyPeriod],
     ) -> None:
         super().__init__()
         self._id = id_
         self._owner_id = owner_id
         self._token = token
         self._name = name
-        self._neuroclone_id = neuroclone_id
+        self._target_user_name = target_user_name
         self._status = status
+        self._neuroclone_id = neuroclone_id
+        self._is_neuroclone_ready = is_neuroclone_ready
         self._reply_period = reply_period
 
     @property
@@ -134,12 +145,20 @@ class Bot(Aggregate):
         return self._name
 
     @property
-    def neuroclone_id(self) -> NeuroCloneID:
-        return self._neuroclone_id
+    def target_user_name(self) -> UserName:
+        return self._target_user_name
 
     @property
     def status(self) -> BotStatus:
         return self._status
+
+    @property
+    def neuroclone_id(self) -> Optional[NeuroCloneID]:
+        return self._neuroclone_id
+
+    @property
+    def is_neuroclone_ready(self) -> bool:
+        return self._is_neuroclone_ready
 
     @property
     def reply_period(self) -> Optional[ReplyPeriod]:
@@ -155,15 +174,17 @@ class Bot(Aggregate):
             owner_id: OwnerTelegramID,
             token: Token,
             name: Name,
-            neuroclone_id: NeuroCloneID,
+            target_user_name: UserName,
     ) -> "Bot":
         bot: "Bot" = cls(
             id_=ID.create(),
             owner_id=owner_id,
             token=token,
             name=name,
-            neuroclone_id=neuroclone_id,
+            target_user_name=target_user_name,
             status=cls.BotStatus.PENDING,
+            neuroclone_id=None,
+            is_neuroclone_ready=False,
             reply_period=None,
         )
         bot._events_to_publish.append(cls.EventBotCreated(
@@ -171,7 +192,7 @@ class Bot(Aggregate):
             payload=cls.EventBotCreated.Payload(
                 bot_id=bot.id.value,
                 owner_telegram_id=owner_id.value,
-                neuroclone_id=neuroclone_id.value,
+                target_user_name=target_user_name.value,
                 bot_name=name.value,
             ),
         ))
@@ -184,6 +205,13 @@ class Bot(Aggregate):
         if not (self._owner_id == user_id):
             raise Bot.NotOwnedError(bot_id=self._id, requester_id=user_id)
 
+    def bind_neuroclone(
+            self,
+            neuroclone_id: NeuroCloneID,
+    ) -> None:
+        self._neuroclone_id = neuroclone_id
+        self._is_neuroclone_ready = True
+
     def set_reply_period(
             self,
             reply_period: ReplyPeriod,
@@ -191,6 +219,8 @@ class Bot(Aggregate):
         self._reply_period = reply_period
 
     def start_bot(self) -> None:
+        if not self._is_neuroclone_ready or self._neuroclone_id is None:
+            raise Bot.NeuroCloneNotReadyError(bot_id=self._id)
         if self.is_running:
             raise Bot.IllegalStateTransitionError(
                 current=self._status,

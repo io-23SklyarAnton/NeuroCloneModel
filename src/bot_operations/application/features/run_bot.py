@@ -8,7 +8,6 @@ from typing import Optional
 from bot_operations.application.interfaces import (
     IBotRunnerService,
     IUnitOfWork,
-    NeuroCloneReader,
 )
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand, Response
@@ -24,11 +23,9 @@ class CommandHandler:
             self,
             uow: IUnitOfWork,
             bot_runner: IBotRunnerService,
-            neuroclone_reader: NeuroCloneReader,
     ) -> None:
         self._uow = uow
         self._bot_runner = bot_runner
-        self._neuroclone_reader = neuroclone_reader
 
     async def handle(
             self,
@@ -38,17 +35,10 @@ class CommandHandler:
         if bot is None:
             return Response(message="Bot not found.")
 
-        is_ready: bool = await self._neuroclone_reader.is_ready(bot.neuroclone_id.value)
-        if not is_ready:
-            return Response(
-                message=(
-                    f"Bot «{bot.name.value}» cannot start: "
-                    f"neuroclone {bot.neuroclone_id.value} is not ready yet."
-                ),
-            )
-
         try:
             bot.start_bot()
+        except Bot.NeuroCloneNotReadyError as e:
+            return Response(message=str(e))
         except Bot.IllegalStateTransitionError:
             return Response(message=f"Bot «{bot.name.value}» is already running.")
 

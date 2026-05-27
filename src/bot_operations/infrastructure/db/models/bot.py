@@ -5,7 +5,7 @@ __all__ = [
 import uuid
 from typing import Optional
 
-from sqlalchemy import BigInteger, Enum, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Enum, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -33,10 +33,20 @@ class Bot(Base):
         String,
         nullable=False,
     )
-    neuroclone_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+    target_user_name: Mapped[str] = mapped_column(
+        String,
         nullable=False,
         index=True,
+    )
+    neuroclone_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+    )
+    is_neuroclone_ready: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
     )
     status: Mapped[BotAggregate.BotStatus] = mapped_column(
         Enum(BotAggregate.BotStatus, name="bot_status"),

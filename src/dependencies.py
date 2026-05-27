@@ -1,5 +1,6 @@
 from dishka import Provider, Scope, provide
 
+from bot_operations.application.event_handlers import OnNeuroCloneReadyHandler
 from bot_operations.application.features import (
     CreateBotCommandHandler,
     ReceiveChatMessageCommandHandler,
@@ -8,7 +9,6 @@ from bot_operations.application.features import (
 from bot_operations.application.interfaces import (
     IBotRunnerService,
     IUnitOfWork as BotOpsUoW,
-    NeuroCloneReader,
     PersonaReplyService,
 )
 from bot_operations.infrastructure.dummy_bot_runner import DummyBotRunnerService
@@ -16,32 +16,44 @@ from bot_operations.infrastructure.in_memory.uow import (
     InMemoryUnitOfWork as BotOpsInMemoryUoW,
 )
 from constants import BASE_PATH
+from data_preparation.application.features import (
+    BuildImitationDatasetCommandHandler,
+    CreateChatExportCommandHandler,
+    IngestChatExportCommandHandler,
+    ProcessChatThreadsCommandHandler,
+)
+from data_preparation.application.interfaces import (
+    IStorage,
+    IUnitOfWork as DataPrepUoW,
+)
+from data_preparation.infrastructure.in_memory.uow import (
+    InMemoryUnitOfWork as DataPrepInMemoryUoW,
+)
+from data_preparation.infrastructure.local.storage import LocalStorage
 from iam.application.features import RegisterUserCommandHandler
 from iam.application.interfaces import IUnitOfWork as IamUoW
 from iam.infrastructure.in_memory.uow import (
     InMemoryUnitOfWork as IamInMemoryUoW,
 )
 from infrastructure.llm import IInferenceEngine
-from ml_pipeline.application.features import (
-    CreateChatExportCommandHandler,
+from model_engine.application.event_handlers import (
+    ITrainingScheduler,
+    OnDatasetPreparedHandler,
+)
+from model_engine.application.features import (
     MarkNeuroCloneFailedCommandHandler,
     MarkNeuroCloneReadyCommandHandler,
-    RequestNeuroCloneCommandHandler,
+    TrainLoraAdapterCommandHandler,
 )
-from ml_pipeline.application.interfaces import (
-    IStorage,
-    IUnitOfWork as MlPipelineUoW,
+from model_engine.application.interfaces import (
+    IUnitOfWork as ModelEngineUoW,
 )
-from ml_pipeline.application.queries import (
-    NeuroCloneReader as MLNeuroCloneReader,
+from model_engine.application.services import (
+    PersonaInferenceService,
 )
-from ml_pipeline.application.services import (
-    PersonaReplyService as MLPersonaReplyService,
+from model_engine.infrastructure.in_memory.uow import (
+    InMemoryUnitOfWork as ModelEngineInMemoryUoW,
 )
-from ml_pipeline.infrastructure.in_memory.uow import (
-    InMemoryUnitOfWork as MlPipelineInMemoryUoW,
-)
-from ml_pipeline.infrastructure.local.storage import LocalStorage
 
 
 class AppProvider(Provider):
@@ -65,23 +77,20 @@ class AppProvider(Provider):
         return BotOpsInMemoryUoW()
 
     @provide(scope=Scope.REQUEST)
-    def get_ml_pipeline_uow(self) -> MlPipelineUoW:
-        return MlPipelineInMemoryUoW()
+    def get_data_prep_uow(self) -> DataPrepUoW:
+        return DataPrepInMemoryUoW()
 
     @provide(scope=Scope.REQUEST)
-    def get_neuroclone_reader(
-            self,
-            uow: MlPipelineUoW,
-    ) -> NeuroCloneReader:
-        return MLNeuroCloneReader(uow=uow)
+    def get_model_engine_uow(self) -> ModelEngineUoW:
+        return ModelEngineInMemoryUoW()
 
     @provide(scope=Scope.REQUEST)
     def get_persona_reply_service(
             self,
-            uow: MlPipelineUoW,
+            uow: ModelEngineUoW,
             inference_engine: IInferenceEngine,
     ) -> PersonaReplyService:
-        return MLPersonaReplyService(
+        return PersonaInferenceService(
             uow=uow,
             inference_engine=inference_engine,
         )
@@ -105,12 +114,10 @@ class AppProvider(Provider):
             self,
             uow: BotOpsUoW,
             bot_runner: IBotRunnerService,
-            neuroclone_reader: NeuroCloneReader,
     ) -> RunBotCommandHandler:
         return RunBotCommandHandler(
             uow=uow,
             bot_runner=bot_runner,
-            neuroclone_reader=neuroclone_reader,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -127,28 +134,77 @@ class AppProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def get_create_chat_export_handler(
             self,
-            uow: MlPipelineUoW,
+            uow: DataPrepUoW,
             storage: IStorage,
     ) -> CreateChatExportCommandHandler:
         return CreateChatExportCommandHandler(uow=uow, storage=storage)
 
     @provide(scope=Scope.REQUEST)
-    def get_request_neuroclone_handler(
+    def get_ingest_chat_export_handler(
             self,
-            uow: MlPipelineUoW,
-    ) -> RequestNeuroCloneCommandHandler:
-        return RequestNeuroCloneCommandHandler(uow=uow)
+            uow: DataPrepUoW,
+            storage: IStorage,
+    ) -> IngestChatExportCommandHandler:
+        return IngestChatExportCommandHandler(uow=uow, storage=storage)
+
+    @provide(scope=Scope.REQUEST)
+    def get_process_chat_threads_handler(
+            self,
+            uow: DataPrepUoW,
+            inference_engine: IInferenceEngine,
+    ) -> ProcessChatThreadsCommandHandler:
+        return ProcessChatThreadsCommandHandler(
+            uow=uow,
+            inference_engine=inference_engine,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def get_build_imitation_dataset_handler(
+            self,
+            uow: DataPrepUoW,
+            storage: IStorage,
+    ) -> BuildImitationDatasetCommandHandler:
+        return BuildImitationDatasetCommandHandler(uow=uow, storage=storage)
+
+    @provide(scope=Scope.REQUEST)
+    def get_train_lora_adapter_handler(
+            self,
+            uow: ModelEngineUoW,
+            inference_engine: IInferenceEngine,
+    ) -> TrainLoraAdapterCommandHandler:
+        return TrainLoraAdapterCommandHandler(
+            uow=uow,
+            inference_engine=inference_engine,
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_mark_neuroclone_ready_handler(
             self,
-            uow: MlPipelineUoW,
+            uow: ModelEngineUoW,
     ) -> MarkNeuroCloneReadyCommandHandler:
         return MarkNeuroCloneReadyCommandHandler(uow=uow)
 
     @provide(scope=Scope.REQUEST)
     def get_mark_neuroclone_failed_handler(
             self,
-            uow: MlPipelineUoW,
+            uow: ModelEngineUoW,
     ) -> MarkNeuroCloneFailedCommandHandler:
         return MarkNeuroCloneFailedCommandHandler(uow=uow)
+
+    @provide(scope=Scope.REQUEST)
+    def get_on_neuroclone_ready_handler(
+            self,
+            uow: BotOpsUoW,
+    ) -> OnNeuroCloneReadyHandler:
+        return OnNeuroCloneReadyHandler(uow=uow)
+
+    @provide(scope=Scope.REQUEST)
+    def get_on_dataset_prepared_handler(
+            self,
+            uow: ModelEngineUoW,
+            training_scheduler: ITrainingScheduler,
+    ) -> OnDatasetPreparedHandler:
+        return OnDatasetPreparedHandler(
+            uow=uow,
+            training_scheduler=training_scheduler,
+        )
