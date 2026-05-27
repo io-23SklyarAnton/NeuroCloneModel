@@ -49,6 +49,7 @@ class NeuroCloneRepository(
     ) -> DBNeuroClone:
         return DBNeuroClone(
             id=aggregate.id.value,
+            owner_telegram_id=aggregate.owner_id.value,
             target_user_name=aggregate.target_user_name.value,
             dataset_file_key=aggregate.dataset_file_key.value,
             status=aggregate.status,
@@ -64,6 +65,7 @@ class NeuroCloneRepository(
     ) -> NeuroCloneAggregate:
         return NeuroCloneAggregate(
             id_=ID(value=db_model.id),
+            owner_id=OwnerTelegramID(value=db_model.owner_telegram_id),
             target_user_name=UserName(value=db_model.target_user_name),
             dataset_file_key=NeuroCloneAggregate.DatasetFileKey(value=db_model.dataset_file_key),
             status=db_model.status,

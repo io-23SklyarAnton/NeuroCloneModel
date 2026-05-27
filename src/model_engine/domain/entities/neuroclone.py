@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Optional
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, ValueObject
+from common.domain.value_objects import ID, UserName, ValueObject, OwnerTelegramID
 
 
 class NeuroClone(Aggregate):
@@ -56,6 +56,7 @@ class NeuroClone(Aggregate):
     def __init__(
             self,
             id_: ID,
+            owner_id: OwnerTelegramID,
             target_user_name: UserName,
             dataset_file_key: Optional[DatasetFileKey],
             status: Status,
@@ -63,6 +64,7 @@ class NeuroClone(Aggregate):
     ) -> None:
         super().__init__()
         self._id = id_
+        self._owner_id = owner_id
         self._target_user_name = target_user_name
         self._dataset_file_key = dataset_file_key
         self._status = status
@@ -71,6 +73,10 @@ class NeuroClone(Aggregate):
     @property
     def id(self) -> ID:
         return self._id
+
+    @property
+    def owner_id(self) -> OwnerTelegramID:
+        return self._owner_id
 
     @property
     def target_user_name(self) -> UserName:
@@ -91,6 +97,22 @@ class NeuroClone(Aggregate):
     @property
     def is_ready(self) -> bool:
         return self._status == self.Status.READY
+
+    @classmethod
+    def create(
+            cls,
+            owner_id: OwnerTelegramID,
+            target_user_name: UserName,
+            dataset_file_key: DatasetFileKey,
+    ) -> "NeuroClone":
+        return NeuroClone(
+            id_=ID(value=uuid.uuid4()),
+            owner_id=owner_id,
+            target_user_name=target_user_name,
+            dataset_file_key=dataset_file_key,
+            status=cls.Status.PREPARING,
+            adapter_path=None,
+        )
 
     def start_training(self) -> None:
         if self._status != self.Status.PREPARING:
