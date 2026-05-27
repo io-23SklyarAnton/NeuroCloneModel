@@ -47,6 +47,9 @@ class NeuroClone(Aggregate):
                 f"Illegal neuroclone status transition: {current.value} -> {requested.value}",
             )
 
+    class EventNeuroCloneCreated(Aggregate.IDomainEvent):
+        ...
+
     class EventNeuroCloneReady(Aggregate.IDomainEvent):
         ...
 
@@ -105,7 +108,7 @@ class NeuroClone(Aggregate):
             target_user_name: UserName,
             dataset_file_key: DatasetFileKey,
     ) -> "NeuroClone":
-        return NeuroClone(
+        neuroclone = NeuroClone(
             id_=ID(value=uuid.uuid4()),
             owner_id=owner_id,
             target_user_name=target_user_name,
@@ -113,6 +116,11 @@ class NeuroClone(Aggregate):
             status=cls.Status.PREPARING,
             adapter_path=None,
         )
+
+        neuroclone._events_to_publish.append(NeuroClone.EventNeuroCloneCreated(
+            object_id=str(neuroclone.id.value),
+        ))
+        return neuroclone
 
     def start_training(self) -> None:
         if self._status != self.Status.PREPARING:
