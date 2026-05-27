@@ -2,7 +2,9 @@ __all__ = ["NeuroClone"]
 
 import uuid
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Self
+
+from pydantic import model_validator
 
 from common.domain.entities import Aggregate
 from common.domain.value_objects import ID, UserName, ValueObject, OwnerTelegramID
@@ -37,6 +39,24 @@ class NeuroClone(Aggregate):
         def __str__(self) -> str:
             return self.value
 
+    class ReplyPeriod(ValueObject):
+        value: int
+
+        def __eq__(self, other: object) -> bool:
+            assert isinstance(other, NeuroClone.ReplyPeriod)
+
+            return self.value == other.value
+
+        def __hash__(self) -> int:
+            return hash(self.value)
+
+        @model_validator(mode='after')
+        def validate_value(self) -> Self:
+            if self.value < 1:
+                raise ValueError("Reply period must be at least 1.")
+
+            return self
+
     class IllegalStateTransitionError(RuntimeError):
         def __init__(
                 self,
@@ -64,6 +84,7 @@ class NeuroClone(Aggregate):
             dataset_file_key: Optional[DatasetFileKey],
             status: Status,
             adapter_path: Optional[AdapterPath],
+            reply_period: Optional[ReplyPeriod],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -72,6 +93,7 @@ class NeuroClone(Aggregate):
         self._dataset_file_key = dataset_file_key
         self._status = status
         self._adapter_path = adapter_path
+        self._reply_period = reply_period
 
     @property
     def id(self) -> ID:
@@ -98,6 +120,10 @@ class NeuroClone(Aggregate):
         return self._adapter_path
 
     @property
+    def reply_period(self) -> Optional[ReplyPeriod]:
+        return self._reply_period
+
+    @property
     def is_ready(self) -> bool:
         return self._status == self.Status.READY
 
@@ -115,6 +141,7 @@ class NeuroClone(Aggregate):
             dataset_file_key=dataset_file_key,
             status=cls.Status.PREPARING,
             adapter_path=None,
+            reply_period=None,
         )
 
         neuroclone._events_to_publish.append(NeuroClone.EventNeuroCloneCreated(

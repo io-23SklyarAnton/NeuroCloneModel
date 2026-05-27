@@ -5,7 +5,7 @@ __all__ = [
 import uuid
 from typing import Optional
 
-from sqlalchemy import BigInteger, Enum, String
+from sqlalchemy import BigInteger, Enum, String, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -38,5 +38,9 @@ class NeuroClone(Base):
     )
     adapter_path: Mapped[Optional[str]] = mapped_column(
         String,
+        nullable=True,
+    )
+    reply_period: Mapped[Optional[int]] = mapped_column(
+        Integer,
         nullable=True,
     )

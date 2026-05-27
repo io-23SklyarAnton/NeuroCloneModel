@@ -5,7 +5,7 @@ __all__ = [
 import uuid
 from typing import Optional
 
-from sqlalchemy import BigInteger, Boolean, Enum, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Enum, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -46,10 +46,6 @@ class Bot(Base):
     status: Mapped[BotAggregate.BotStatus] = mapped_column(
         Enum(BotAggregate.BotStatus, name="bot_status"),
         nullable=False,
-    )
-    reply_period: Mapped[Optional[int]] = mapped_column(
-        Integer,
-        nullable=True,
     )
 
     __table_args__ = (

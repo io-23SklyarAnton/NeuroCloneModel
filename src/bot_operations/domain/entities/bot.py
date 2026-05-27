@@ -2,9 +2,7 @@ __all__ = ["Bot"]
 
 import uuid
 from enum import StrEnum
-from typing import Optional, Self
-
-from pydantic import model_validator
+from typing import Optional
 
 from common.domain.entities import Aggregate
 from common.domain.value_objects import ID, ValueObject, OwnerTelegramID
@@ -46,24 +44,6 @@ class Bot(Aggregate):
         def __str__(self) -> str:
             return str(self.value)
 
-    class ReplyPeriod(ValueObject):
-        value: int
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, Bot.ReplyPeriod)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
-
-        @model_validator(mode='after')
-        def validate_value(self) -> Self:
-            if self.value < 1:
-                raise ValueError("Reply period must be at least 1.")
-
-            return self
-
     class IllegalStateTransitionError(RuntimeError):
         def __init__(
                 self,
@@ -102,7 +82,6 @@ class Bot(Aggregate):
             status: BotStatus,
             neuroclone_id: Optional[NeuroCloneID],
             is_neuroclone_ready: bool,
-            reply_period: Optional[ReplyPeriod],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -112,7 +91,6 @@ class Bot(Aggregate):
         self._status = status
         self._neuroclone_id = neuroclone_id
         self._is_neuroclone_ready = is_neuroclone_ready
-        self._reply_period = reply_period
 
     @property
     def id(self) -> ID:
@@ -143,10 +121,6 @@ class Bot(Aggregate):
         return self._is_neuroclone_ready
 
     @property
-    def reply_period(self) -> Optional[ReplyPeriod]:
-        return self._reply_period
-
-    @property
     def is_running(self) -> bool:
         return self._status == self.BotStatus.RUNNING
 
@@ -165,7 +139,6 @@ class Bot(Aggregate):
             status=cls.BotStatus.PENDING,
             neuroclone_id=None,
             is_neuroclone_ready=False,
-            reply_period=None,
         )
         bot._events_to_publish.append(cls.EventBotCreated(
             object_id=str(bot.id.value),
@@ -190,12 +163,6 @@ class Bot(Aggregate):
     ) -> None:
         self._neuroclone_id = neuroclone_id
         self._is_neuroclone_ready = True
-
-    def set_reply_period(
-            self,
-            reply_period: ReplyPeriod,
-    ) -> None:
-        self._reply_period = reply_period
 
     def start_bot(self) -> None:
         if not self._is_neuroclone_ready or self._neuroclone_id is None:

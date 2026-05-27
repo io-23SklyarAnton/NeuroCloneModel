@@ -57,6 +57,10 @@ class NeuroCloneRepository(
                 aggregate.adapter_path.value
                 if aggregate.adapter_path is not None else None
             ),
+            reply_period=(
+                aggregate.reply_period.value
+                if aggregate.reply_period is not None else None
+            )
         )
 
     def from_db_model_to_aggregate(
@@ -72,6 +76,10 @@ class NeuroCloneRepository(
             adapter_path=(
                 NeuroCloneAggregate.AdapterPath(value=db_model.adapter_path)
                 if db_model.adapter_path is not None else None
+            ),
+            reply_period=(
+                NeuroCloneAggregate.ReplyPeriod(value=db_model.reply_period)
+                if db_model.reply_period is not None else None
             ),
         )
 

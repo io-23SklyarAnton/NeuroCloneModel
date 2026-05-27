@@ -77,10 +77,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             ),
             is_neuroclone_ready=aggregate.is_neuroclone_ready,
             status=aggregate.status,
-            reply_period=(
-                aggregate.reply_period.value
-                if aggregate.reply_period is not None else None
-            ),
         )
 
     def from_db_model_to_aggregate(
@@ -98,10 +94,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
             ),
             is_neuroclone_ready=db_model.is_neuroclone_ready,
             status=db_model.status,
-            reply_period=(
-                BotAggregate.ReplyPeriod(value=db_model.reply_period)
-                if db_model.reply_period is not None else None
-            ),
         )
 
     def _filter_by_id(
