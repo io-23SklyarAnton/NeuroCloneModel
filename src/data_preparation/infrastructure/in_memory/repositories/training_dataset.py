@@ -3,7 +3,7 @@ __all__ = ["InMemoryTrainingDatasetRepository"]
 from typing import Optional
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from data_preparation.application.interfaces.repositories import ITrainingDatasetRepository
 from data_preparation.domain.entities import TrainingDataset
@@ -31,7 +31,7 @@ class InMemoryTrainingDatasetRepository(InMemoryBaseRepository[TrainingDataset],
 
     async def get_by_owner_id(
             self,
-            owner_id: TrainingDataset.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> list[TrainingDataset]:
         return [
             dataset for dataset in self._storage.values()

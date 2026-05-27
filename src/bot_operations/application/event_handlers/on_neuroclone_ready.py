@@ -4,7 +4,7 @@ __all__ = [
 
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
-from common.domain.value_objects import UserName
+from common.domain.value_objects import UserName, OwnerTelegramID
 from contracts.integration_events import NeuroCloneReadyEvent
 
 
@@ -20,7 +20,7 @@ class OnNeuroCloneReadyHandler:
             event: NeuroCloneReadyEvent,
     ) -> None:
         affected_bots: list[Bot] = await self._uow.bot.get_by_owner_and_target_user(
-            owner_id=Bot.OwnerTelegramID(value=event.owner_telegram_id),
+            owner_id=OwnerTelegramID(value=event.owner_telegram_id),
             target_user_name=UserName(value=event.target_user_name),
         )
         if not affected_bots:

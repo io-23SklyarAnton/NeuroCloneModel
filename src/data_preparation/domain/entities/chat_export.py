@@ -3,7 +3,7 @@ __all__ = ["ChatExport"]
 from enum import StrEnum
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ValueObject, UserName
+from common.domain.value_objects import ValueObject, UserName, OwnerTelegramID
 from data_preparation.domain.value_objects import ExportFileKey
 
 
@@ -19,17 +19,6 @@ class ChatExport(Aggregate):
 
         def __eq__(self, other: object) -> bool:
             assert isinstance(other, ChatExport.ChatID)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
-
-    class OwnerTelegramID(ValueObject):
-        value: int
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, ChatExport.OwnerTelegramID)
 
             return self.value == other.value
 

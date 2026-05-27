@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from common.domain.value_objects import UserName
+from common.domain.value_objects import UserName, OwnerTelegramID
 from ml_pipeline.domain.entities import ChatExport, ParsedMessage
 from ml_pipeline.domain.value_objects import DateUnixtime, ExportFileKey
 from ml_pipeline.infrastructure.in_memory.uow import InMemoryUnitOfWork
@@ -41,7 +41,7 @@ def load_irc_dataset_to_memory(
 
         chat_export = ChatExport.create(
             chat_id=chat_id,
-            owner_id=ChatExport.OwnerTelegramID(value=0),
+            owner_id=OwnerTelegramID(value=0),
             export_file_key=ExportFileKey(value=f"eval-{chat_id.value}.json"),
         )
         uow.chat_export.create(chat_export)

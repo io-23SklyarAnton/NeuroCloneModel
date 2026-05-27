@@ -21,7 +21,7 @@ from bot_operations.application.features import (
     CreateBotCommandHandler,
 )
 from bot_operations.domain.entities import Bot
-from common.domain.value_objects import UserName
+from common.domain.value_objects import UserName, OwnerTelegramID
 from common.exceptions.client.malformed_request import MissingUserException
 from data_preparation.application.features import (
     CreateChatExportCommand,
@@ -119,7 +119,7 @@ async def handle_chat_export_file(
 
     file_buffer.seek(0)
     create_export_response = await create_chat_export_handler.handle(CreateChatExportCommand(
-        owner_id=ChatExport.OwnerTelegramID(value=message.from_user.id),
+        owner_id=OwnerTelegramID(value=message.from_user.id),
         file_bytes=file_buffer,
     ))
     if create_export_response.chat_export_id is None:
@@ -170,7 +170,7 @@ async def handle_target_user_selection(
     owner_telegram_id: int = callback.from_user.id
 
     bot_response = await create_bot_handler.handle(CreateBotCommand(
-        owner_id=Bot.OwnerTelegramID(value=owner_telegram_id),
+        owner_id=OwnerTelegramID(value=owner_telegram_id),
         bot_name=Bot.Name(value=bot_name),
         bot_token=Bot.Token(value=bot_token),
         target_user_name=UserName(value=target_user_name),

@@ -7,7 +7,7 @@ from typing import Optional, Self
 from pydantic import model_validator
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject
+from common.domain.value_objects import ID, ValueObject, OwnerTelegramID
 
 
 class Bot(Aggregate):
@@ -31,17 +31,6 @@ class Bot(Aggregate):
             assert isinstance(other, Bot.Name)
 
             return self.value == other.value
-
-    class OwnerTelegramID(ValueObject):
-        value: int
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, Bot.OwnerTelegramID)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
 
     class NeuroCloneID(ValueObject):
         value: uuid.UUID
@@ -94,7 +83,7 @@ class Bot(Aggregate):
         def __init__(
                 self,
                 bot_id: ID,
-                requester_id: "Bot.OwnerTelegramID",
+                requester_id: OwnerTelegramID,
         ) -> None:
             super().__init__(f"User {requester_id.value} is not the owner of bot {bot_id}")
 

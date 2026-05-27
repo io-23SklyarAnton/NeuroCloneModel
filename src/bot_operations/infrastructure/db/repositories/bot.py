@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot as BotAggregate
 from bot_operations.infrastructure.db.models import Bot as DBBot
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, OwnerTelegramID
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 
@@ -53,7 +53,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
 
     async def get_by_owner_id(
             self,
-            owner_id: BotAggregate.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> list[BotAggregate]:
         query: Query = self.base_query()
 
@@ -89,7 +89,7 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
     ) -> BotAggregate:
         return BotAggregate(
             id_=ID(value=db_model.id),
-            owner_id=BotAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
+            owner_id=OwnerTelegramID(value=db_model.owner_telegram_id),
             token=BotAggregate.Token(value=db_model.token),
             name=BotAggregate.Name(value=db_model.name),
             neuroclone_id=(
@@ -121,6 +121,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
     def _filter_by_owner_id(
             self,
             query: Query,
-            owner_id: BotAggregate.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> Query:
         return query.filter(self.model.owner_telegram_id == owner_id.value)

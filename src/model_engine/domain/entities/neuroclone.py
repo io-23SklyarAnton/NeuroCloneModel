@@ -15,17 +15,6 @@ class NeuroClone(Aggregate):
         READY = "READY"
         FAILED = "FAILED"
 
-    class OwnerTelegramID(ValueObject):
-        value: int
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, NeuroClone.OwnerTelegramID)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
-
     class DatasetFileKey(ValueObject):
         value: str
 
@@ -59,30 +48,21 @@ class NeuroClone(Aggregate):
             )
 
     class EventNeuroCloneReady(Aggregate.IDomainEvent):
-        class Payload(Aggregate.IDomainEvent.Payload):
-            neuroclone_id: uuid.UUID
-            owner_telegram_id: int
-            target_user_name: str
+        ...
 
     class EventNeuroCloneFailed(Aggregate.IDomainEvent):
-        class Payload(Aggregate.IDomainEvent.Payload):
-            neuroclone_id: uuid.UUID
-            owner_telegram_id: int
-            target_user_name: str
-            reason: str
+        ...
 
     def __init__(
             self,
             id_: ID,
-            owner_id: OwnerTelegramID,
             target_user_name: UserName,
-            dataset_file_key: DatasetFileKey,
+            dataset_file_key: Optional[DatasetFileKey],
             status: Status,
             adapter_path: Optional[AdapterPath],
     ) -> None:
         super().__init__()
         self._id = id_
-        self._owner_id = owner_id
         self._target_user_name = target_user_name
         self._dataset_file_key = dataset_file_key
         self._status = status
@@ -93,15 +73,11 @@ class NeuroClone(Aggregate):
         return self._id
 
     @property
-    def owner_id(self) -> OwnerTelegramID:
-        return self._owner_id
-
-    @property
     def target_user_name(self) -> UserName:
         return self._target_user_name
 
     @property
-    def dataset_file_key(self) -> DatasetFileKey:
+    def dataset_file_key(self) -> Optional[DatasetFileKey]:
         return self._dataset_file_key
 
     @property
@@ -115,22 +91,6 @@ class NeuroClone(Aggregate):
     @property
     def is_ready(self) -> bool:
         return self._status == self.Status.READY
-
-    @classmethod
-    def request(
-            cls,
-            owner_id: OwnerTelegramID,
-            target_user_name: UserName,
-            dataset_file_key: DatasetFileKey,
-    ) -> "NeuroClone":
-        return cls(
-            id_=ID.create(),
-            owner_id=owner_id,
-            target_user_name=target_user_name,
-            dataset_file_key=dataset_file_key,
-            status=cls.Status.PREPARING,
-            adapter_path=None,
-        )
 
     def start_training(self) -> None:
         if self._status != self.Status.PREPARING:
@@ -156,25 +116,11 @@ class NeuroClone(Aggregate):
 
         self._events_to_publish.append(NeuroClone.EventNeuroCloneReady(
             object_id=str(self._id.value),
-            payload=NeuroClone.EventNeuroCloneReady.Payload(
-                neuroclone_id=self._id.value,
-                owner_telegram_id=self._owner_id.value,
-                target_user_name=self._target_user_name.value,
-            ),
         ))
 
-    def mark_failed(
-            self,
-            reason: str,
-    ) -> None:
+    def mark_failed(self) -> None:
         self._status = self.Status.FAILED
 
         self._events_to_publish.append(NeuroClone.EventNeuroCloneFailed(
             object_id=str(self._id.value),
-            payload=NeuroClone.EventNeuroCloneFailed.Payload(
-                neuroclone_id=self._id.value,
-                owner_telegram_id=self._owner_id.value,
-                target_user_name=self._target_user_name.value,
-                reason=reason,
-            ),
         ))

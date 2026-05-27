@@ -2,6 +2,7 @@ __all__ = [
     "ID",
     "ValueObject",
     "UserName",
+    "OwnerTelegramID",
 ]
 
 import abc
@@ -47,3 +48,15 @@ class UserName(ValueObject):
         assert isinstance(other, UserName)
 
         return self.value == other.value
+
+
+class OwnerTelegramID(ValueObject):
+    value: int
+
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(other, OwnerTelegramID)
+
+        return self.value == other.value
+
+    def __hash__(self) -> int:
+        return hash(self.value)

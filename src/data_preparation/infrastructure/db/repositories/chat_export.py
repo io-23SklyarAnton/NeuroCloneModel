@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import UserName
+from common.domain.value_objects import UserName, OwnerTelegramID
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from data_preparation.application.interfaces.repositories import IChatExportRepository
@@ -60,7 +60,7 @@ class ChatExportRepository(IChatExportRepository, BaseRepository[ChatExportAggre
     ) -> ChatExportAggregate:
         return ChatExportAggregate(
             chat_id=ChatExportAggregate.ChatID(value=db_model.chat_id),
-            owner_id=ChatExportAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
+            owner_id=OwnerTelegramID(value=db_model.owner_telegram_id),
             target_user_name=UserName(value=db_model.target_user_name),
             export_file_key=ExportFileKey(value=db_model.export_file_key),
             status=db_model.status,

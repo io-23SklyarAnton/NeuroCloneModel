@@ -3,7 +3,7 @@ __all__ = ["INeuroCloneRepository"]
 import abc
 from typing import Optional
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.i_base_repository import IBaseRepository
 from model_engine.domain.entities import NeuroClone
 
@@ -24,5 +24,5 @@ class INeuroCloneRepository(IBaseRepository[NeuroClone]):
     @abc.abstractmethod
     async def get_by_owner_id(
             self,
-            owner_id: NeuroClone.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> list[NeuroClone]: ...

@@ -4,23 +4,12 @@ import uuid
 from datetime import datetime
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, ValueObject
+from common.domain.value_objects import ID, UserName, OwnerTelegramID
 from data_preparation.domain.entities.chat_export import ChatExport
 from data_preparation.domain.value_objects import DatasetFileKey
 
 
 class TrainingDataset(Aggregate):
-    class OwnerTelegramID(ValueObject):
-        value: int
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, TrainingDataset.OwnerTelegramID)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
-
     class EventDatasetBuilt(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):
             owner_telegram_id: int

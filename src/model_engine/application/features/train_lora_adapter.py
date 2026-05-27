@@ -42,7 +42,7 @@ class CommandHandler:
                 adapter_path=str(command.adapter_path),
             )
         except Exception as exc:
-            neuroclone.mark_failed(reason=str(exc))
+            neuroclone.mark_failed()
             self._uow.neuroclone.update(neuroclone)
             await self._uow.commit()
             return Response(

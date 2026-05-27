@@ -26,7 +26,7 @@ class CommandHandler:
             command: Command,
     ) -> Response:
         neuroclone: NeuroClone = await self._uow.neuroclone.get_by_id_or_raise(command.neuroclone_id)
-        neuroclone.mark_failed(command.reason)
+        neuroclone.mark_failed()
 
         self._uow.neuroclone.update(neuroclone)
         await self._uow.commit()

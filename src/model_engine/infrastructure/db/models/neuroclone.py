@@ -20,11 +20,6 @@ class NeuroClone(Base):
         UUID(as_uuid=True),
         primary_key=True,
     )
-    owner_telegram_id: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-        index=True,
-    )
     target_user_name: Mapped[str] = mapped_column(
         String,
         nullable=False,

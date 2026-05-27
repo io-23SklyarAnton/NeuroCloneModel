@@ -3,7 +3,7 @@ __all__ = ["ITrainingDatasetRepository"]
 import abc
 from typing import Optional
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.i_base_repository import IBaseRepository
 from data_preparation.domain.entities import TrainingDataset
 
@@ -24,5 +24,5 @@ class ITrainingDatasetRepository(IBaseRepository[TrainingDataset]):
     @abc.abstractmethod
     async def get_by_owner_id(
             self,
-            owner_id: TrainingDataset.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> list[TrainingDataset]: ...

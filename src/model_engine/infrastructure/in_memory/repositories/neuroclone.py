@@ -3,7 +3,7 @@ __all__ = ["InMemoryNeuroCloneRepository"]
 from typing import Optional
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from model_engine.application.interfaces.repositories import INeuroCloneRepository
 from model_engine.domain.entities import NeuroClone
@@ -34,7 +34,7 @@ class InMemoryNeuroCloneRepository(
 
     async def get_by_owner_id(
             self,
-            owner_id: NeuroClone.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> list[NeuroClone]:
         return [
             neuroclone

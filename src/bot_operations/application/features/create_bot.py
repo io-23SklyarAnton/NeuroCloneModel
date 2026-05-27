@@ -10,11 +10,11 @@ from bot_operations.application import constants
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand, Response
-from common.domain.value_objects import UserName
+from common.domain.value_objects import UserName, OwnerTelegramID
 
 
 class Command(ICommand):
-    owner_id: Bot.OwnerTelegramID
+    owner_id: OwnerTelegramID
     bot_name: Bot.Name
     bot_token: Bot.Token
     target_user_name: UserName

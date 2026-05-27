@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID, UserName, OwnerTelegramID
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from model_engine.application.interfaces.repositories import INeuroCloneRepository
@@ -15,8 +15,8 @@ from model_engine.infrastructure.db.models import NeuroClone as DBNeuroClone
 
 
 class NeuroCloneRepository(
-        INeuroCloneRepository,
-        BaseRepository[NeuroCloneAggregate, DBNeuroClone],
+    INeuroCloneRepository,
+    BaseRepository[NeuroCloneAggregate, DBNeuroClone],
 ):
     @property
     def model(self) -> type[DBNeuroClone]:
@@ -43,24 +43,12 @@ class NeuroCloneRepository(
         db_neuroclone: Optional[DBNeuroClone] = query.first()
         return self.get_optional(db_neuroclone)
 
-    async def get_by_owner_id(
-            self,
-            owner_id: NeuroCloneAggregate.OwnerTelegramID,
-    ) -> list[NeuroCloneAggregate]:
-        query: Query = self.base_query()
-
-        query = self._filter_by_owner_id(query, owner_id)
-
-        db_neuroclones: list[DBNeuroClone] = query.all()
-        return self.get_all(db_neuroclones)
-
     def from_aggregate_to_db_model(
             self,
             aggregate: NeuroCloneAggregate,
     ) -> DBNeuroClone:
         return DBNeuroClone(
             id=aggregate.id.value,
-            owner_telegram_id=aggregate.owner_id.value,
             target_user_name=aggregate.target_user_name.value,
             dataset_file_key=aggregate.dataset_file_key.value,
             status=aggregate.status,
@@ -76,7 +64,6 @@ class NeuroCloneRepository(
     ) -> NeuroCloneAggregate:
         return NeuroCloneAggregate(
             id_=ID(value=db_model.id),
-            owner_id=NeuroCloneAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
             target_user_name=UserName(value=db_model.target_user_name),
             dataset_file_key=NeuroCloneAggregate.DatasetFileKey(value=db_model.dataset_file_key),
             status=db_model.status,
@@ -92,10 +79,3 @@ class NeuroCloneRepository(
             neuroclone_id: ID,
     ) -> Query:
         return query.filter(self.model.id == neuroclone_id.value)
-
-    def _filter_by_owner_id(
-            self,
-            query: Query,
-            owner_id: NeuroCloneAggregate.OwnerTelegramID,
-    ) -> Query:
-        return query.filter(self.model.owner_telegram_id == owner_id.value)

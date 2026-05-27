@@ -4,7 +4,7 @@ import abc
 from typing import Optional
 
 from bot_operations.domain.entities import Bot
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.i_base_repository import IBaseRepository
 
 
@@ -19,4 +19,4 @@ class IBotRepository(IBaseRepository[Bot]):
     async def get_by_token_optional(self, token: Bot.Token) -> Optional[Bot]: ...
 
     @abc.abstractmethod
-    async def get_by_owner_id(self, owner_id: Bot.OwnerTelegramID) -> list[Bot]: ...
+    async def get_by_owner_id(self, owner_id: OwnerTelegramID) -> list[Bot]: ...

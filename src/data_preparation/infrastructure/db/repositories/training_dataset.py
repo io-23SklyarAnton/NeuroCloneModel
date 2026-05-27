@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID, UserName, OwnerTelegramID
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from data_preparation.application.interfaces.repositories import ITrainingDatasetRepository
@@ -75,7 +75,7 @@ class TrainingDatasetRepository(
     ) -> TrainingDatasetAggregate:
         return TrainingDatasetAggregate(
             id_=ID(value=db_model.id),
-            owner_id=TrainingDatasetAggregate.OwnerTelegramID(value=db_model.owner_telegram_id),
+            owner_id=OwnerTelegramID(value=db_model.owner_telegram_id),
             target_user=UserName(value=db_model.target_user),
             source_chat_export_id=ChatExport.ChatID(value=db_model.source_chat_export_id),
             file_key=DatasetFileKey(value=db_model.file_key),
@@ -93,6 +93,6 @@ class TrainingDatasetRepository(
     def _filter_by_owner_id(
             self,
             query: Query,
-            owner_id: TrainingDatasetAggregate.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> Query:
         return query.filter(self.model.owner_telegram_id == owner_id.value)

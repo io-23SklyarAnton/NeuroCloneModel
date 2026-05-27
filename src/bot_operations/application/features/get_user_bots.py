@@ -13,10 +13,11 @@ import pydantic
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand
+from common.domain.value_objects import OwnerTelegramID
 
 
 class Command(ICommand):
-    owner_id: Bot.OwnerTelegramID
+    owner_id: OwnerTelegramID
 
 
 class BotView(pydantic.BaseModel):

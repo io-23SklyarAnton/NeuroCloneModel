@@ -5,7 +5,7 @@ __all__ = [
 
 from typing import Protocol
 
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID, UserName, OwnerTelegramID
 from contracts.integration_events import DatasetPreparedEvent
 from model_engine.application.interfaces import IUnitOfWork
 from model_engine.domain.entities import NeuroClone
@@ -32,7 +32,7 @@ class OnDatasetPreparedHandler:
             event: DatasetPreparedEvent,
     ) -> None:
         neuroclone: NeuroClone = NeuroClone.request(
-            owner_id=NeuroClone.OwnerTelegramID(value=event.owner_telegram_id),
+            owner_id=OwnerTelegramID(value=event.owner_telegram_id),
             target_user_name=UserName(value=event.target_user_name),
             dataset_file_key=NeuroClone.DatasetFileKey(value=event.dataset_file_key),
         )
