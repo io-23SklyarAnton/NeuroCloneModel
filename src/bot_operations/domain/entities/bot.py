@@ -81,7 +81,6 @@ class Bot(Aggregate):
             name: Name,
             status: BotStatus,
             neuroclone_id: Optional[NeuroCloneID],
-            is_neuroclone_ready: bool,
     ) -> None:
         super().__init__()
         self._id = id_
@@ -90,7 +89,6 @@ class Bot(Aggregate):
         self._name = name
         self._status = status
         self._neuroclone_id = neuroclone_id
-        self._is_neuroclone_ready = is_neuroclone_ready
 
     @property
     def id(self) -> ID:
@@ -117,10 +115,6 @@ class Bot(Aggregate):
         return self._neuroclone_id
 
     @property
-    def is_neuroclone_ready(self) -> bool:
-        return self._is_neuroclone_ready
-
-    @property
     def is_running(self) -> bool:
         return self._status == self.BotStatus.RUNNING
 
@@ -138,7 +132,6 @@ class Bot(Aggregate):
             name=name,
             status=cls.BotStatus.PENDING,
             neuroclone_id=None,
-            is_neuroclone_ready=False,
         )
         bot._events_to_publish.append(cls.EventBotCreated(
             object_id=str(bot.id.value),
@@ -162,10 +155,9 @@ class Bot(Aggregate):
             neuroclone_id: NeuroCloneID,
     ) -> None:
         self._neuroclone_id = neuroclone_id
-        self._is_neuroclone_ready = True
 
     def start_bot(self) -> None:
-        if not self._is_neuroclone_ready or self._neuroclone_id is None:
+        if self._neuroclone_id is None:
             raise Bot.NeuroCloneNotReadyError(bot_id=self._id)
         if self.is_running:
             raise Bot.IllegalStateTransitionError(

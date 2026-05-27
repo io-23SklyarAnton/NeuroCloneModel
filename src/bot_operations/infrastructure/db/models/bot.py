@@ -38,11 +38,6 @@ class Bot(Base):
         nullable=True,
         index=True,
     )
-    is_neuroclone_ready: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        default=False,
-    )
     status: Mapped[BotAggregate.BotStatus] = mapped_column(
         Enum(BotAggregate.BotStatus, name="bot_status"),
         nullable=False,

@@ -75,7 +75,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 aggregate.neuroclone_id.value
                 if aggregate.neuroclone_id is not None else None
             ),
-            is_neuroclone_ready=aggregate.is_neuroclone_ready,
             status=aggregate.status,
         )
 
@@ -92,7 +91,6 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 BotAggregate.NeuroCloneID(value=db_model.neuroclone_id)
                 if db_model.neuroclone_id is not None else None
             ),
-            is_neuroclone_ready=db_model.is_neuroclone_ready,
             status=db_model.status,
         )
 
