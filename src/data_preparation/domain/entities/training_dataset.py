@@ -1,6 +1,5 @@
 __all__ = ["TrainingDataset"]
 
-import uuid
 from datetime import datetime
 
 from common.domain.entities import Aggregate

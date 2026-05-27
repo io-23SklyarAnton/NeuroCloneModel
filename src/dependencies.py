@@ -1,6 +1,5 @@
 from dishka import Provider, Scope, provide
 
-from bot_operations.application.event_handlers import OnNeuroCloneReadyHandler
 from bot_operations.application.features import (
     CreateBotCommandHandler,
     ReceiveChatMessageCommandHandler,
@@ -36,13 +35,7 @@ from iam.infrastructure.in_memory.uow import (
     InMemoryUnitOfWork as IamInMemoryUoW,
 )
 from infrastructure.llm import IInferenceEngine
-from model_engine.application.event_handlers import (
-    ITrainingScheduler,
-    OnDatasetPreparedHandler,
-)
 from model_engine.application.features import (
-    MarkNeuroCloneFailedCommandHandler,
-    MarkNeuroCloneReadyCommandHandler,
     TrainLoraAdapterCommandHandler,
 )
 from model_engine.application.interfaces import (
@@ -175,36 +168,4 @@ class AppProvider(Provider):
         return TrainLoraAdapterCommandHandler(
             uow=uow,
             inference_engine=inference_engine,
-        )
-
-    @provide(scope=Scope.REQUEST)
-    def get_mark_neuroclone_ready_handler(
-            self,
-            uow: ModelEngineUoW,
-    ) -> MarkNeuroCloneReadyCommandHandler:
-        return MarkNeuroCloneReadyCommandHandler(uow=uow)
-
-    @provide(scope=Scope.REQUEST)
-    def get_mark_neuroclone_failed_handler(
-            self,
-            uow: ModelEngineUoW,
-    ) -> MarkNeuroCloneFailedCommandHandler:
-        return MarkNeuroCloneFailedCommandHandler(uow=uow)
-
-    @provide(scope=Scope.REQUEST)
-    def get_on_neuroclone_ready_handler(
-            self,
-            uow: BotOpsUoW,
-    ) -> OnNeuroCloneReadyHandler:
-        return OnNeuroCloneReadyHandler(uow=uow)
-
-    @provide(scope=Scope.REQUEST)
-    def get_on_dataset_prepared_handler(
-            self,
-            uow: ModelEngineUoW,
-            training_scheduler: ITrainingScheduler,
-    ) -> OnDatasetPreparedHandler:
-        return OnDatasetPreparedHandler(
-            uow=uow,
-            training_scheduler=training_scheduler,
         )

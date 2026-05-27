@@ -45,7 +45,6 @@ class CommandHandler:
             owner_id=command.owner_id,
             token=command.bot_token,
             name=command.bot_name,
-            target_user_name=command.target_user_name,
         )
         self._uow.bot.create(bot)
         await self._uow.commit()

@@ -46,7 +46,7 @@ class TrainingDatasetRepository(
 
     async def get_by_owner_id(
             self,
-            owner_id: TrainingDatasetAggregate.OwnerTelegramID,
+            owner_id: OwnerTelegramID,
     ) -> list[TrainingDatasetAggregate]:
         query: Query = self.base_query()
 

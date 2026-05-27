@@ -27,7 +27,6 @@ from data_preparation.application.features import (
     CreateChatExportCommand,
     CreateChatExportCommandHandler,
 )
-from data_preparation.domain.entities import ChatExport
 
 _CALLBACK_TARGET_USER_PREFIX: str = "create_bot:target_user:"
 _FSM_KEY_BOT_NAME: str = "bot_name"

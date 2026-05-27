@@ -20,9 +20,3 @@ class INeuroCloneRepository(IBaseRepository[NeuroClone]):
             self,
             neuroclone_id: ID,
     ) -> Optional[NeuroClone]: ...
-
-    @abc.abstractmethod
-    async def get_by_owner_id(
-            self,
-            owner_id: OwnerTelegramID,
-    ) -> list[NeuroClone]: ...

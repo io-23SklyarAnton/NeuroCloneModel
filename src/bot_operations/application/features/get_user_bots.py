@@ -5,8 +5,6 @@ __all__ = [
     "BotView",
 ]
 
-import uuid
-from typing import Optional
 
 import pydantic
 
