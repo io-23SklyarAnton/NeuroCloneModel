@@ -14,8 +14,6 @@ from model_engine.domain.entities import NeuroClone
 
 class Command(ICommand):
     neuroclone_id: ID
-    train_data_path: Path
-    adapter_path: Path
 
 
 class CommandHandler:
@@ -36,10 +34,12 @@ class CommandHandler:
         self._uow.neuroclone.update(neuroclone)
         await self._uow.commit()
 
+        adapter_path: str = self._build_adapter_path(neuroclone_id=neuroclone.id)
+
         try:
             await self._inference_engine.train_lora(
-                train_data_path=str(command.train_data_path),
-                adapter_path=str(command.adapter_path),
+                train_data_path=str(neuroclone.dataset_file_key),
+                adapter_path=adapter_path,
             )
         except Exception as exc:
             neuroclone.mark_failed()
@@ -49,10 +49,15 @@ class CommandHandler:
                 message=f"NeuroClone {neuroclone.id.value} training failed: {exc}",
             )
 
-        neuroclone.mark_ready(NeuroClone.AdapterPath(value=str(command.adapter_path)))
+        neuroclone.mark_ready(NeuroClone.AdapterPath(value=str(adapter_path)))
         self._uow.neuroclone.update(neuroclone)
         await self._uow.commit()
 
         return Response(
             message=f"NeuroClone {neuroclone.id.value} is now {neuroclone.status.value}.",
         )
+
+    def _build_adapter_path(self, neuroclone_id: ID) -> str:
+        base_path = Path("/adapters")
+        adapter_file_name = f"{neuroclone_id.value}.safetensors"
+        return str(base_path / adapter_file_name)
