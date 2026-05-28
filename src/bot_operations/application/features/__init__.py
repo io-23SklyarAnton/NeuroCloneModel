@@ -1,3 +1,7 @@
+from bot_operations.application.features.assign_neuroclone_to_bot import (
+    Command as AssignNeuroCloneToBotCommand,
+    CommandHandler as AssignNeuroCloneToBotCommandHandler,
+)
 from bot_operations.application.features.create_bot import (
     Command as CreateBotCommand,
     CommandHandler as CreateBotCommandHandler,
@@ -19,6 +23,8 @@ from bot_operations.application.features.run_bot import (
 )
 
 __all__ = [
+    "AssignNeuroCloneToBotCommand",
+    "AssignNeuroCloneToBotCommandHandler",
     "CreateBotCommand",
     "CreateBotCommandHandler",
     "GetUserBotsBotView",

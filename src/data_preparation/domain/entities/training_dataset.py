@@ -16,6 +16,8 @@ class TrainingDataset(Aggregate):
             source_chat_export_id: int
             n_pairs: int
 
+        payload: Payload
+
     def __init__(
             self,
             id_: ID,

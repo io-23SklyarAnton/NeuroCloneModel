@@ -1,6 +1,7 @@
 from dishka import Provider, Scope, provide
 
 from bot_operations.application.features import (
+    AssignNeuroCloneToBotCommandHandler,
     CreateBotCommandHandler,
     ReceiveChatMessageCommandHandler,
     RunBotCommandHandler,
@@ -36,6 +37,7 @@ from iam.infrastructure.in_memory.uow import (
 )
 from infrastructure.llm import IInferenceEngine
 from model_engine.application.features import (
+    CreateNeuroCloneCommandHandler,
     TrainLoraAdapterCommandHandler,
 )
 from model_engine.application.interfaces import (
@@ -124,6 +126,13 @@ class AppProvider(Provider):
         )
 
     @provide(scope=Scope.REQUEST)
+    def get_assign_neuroclone_to_bot_handler(
+            self,
+            uow: BotOpsUoW,
+    ) -> AssignNeuroCloneToBotCommandHandler:
+        return AssignNeuroCloneToBotCommandHandler(uow=uow)
+
+    @provide(scope=Scope.REQUEST)
     def get_create_chat_export_handler(
             self,
             uow: DataPrepUoW,
@@ -157,6 +166,13 @@ class AppProvider(Provider):
             storage: IStorage,
     ) -> BuildImitationDatasetCommandHandler:
         return BuildImitationDatasetCommandHandler(uow=uow, storage=storage)
+
+    @provide(scope=Scope.REQUEST)
+    def get_create_neuroclone_handler(
+            self,
+            uow: ModelEngineUoW,
+    ) -> CreateNeuroCloneCommandHandler:
+        return CreateNeuroCloneCommandHandler(uow=uow)
 
     @provide(scope=Scope.REQUEST)
     def get_train_lora_adapter_handler(
