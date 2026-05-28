@@ -59,7 +59,7 @@ class CommandHandler:
         live_chat.append_message(incoming_message)
         self._uow.live_chat.update(live_chat)
 
-        if not bot.is_neuroclone_ready or bot.neuroclone_id is None:
+        if bot.neuroclone_id is None:
             await self._uow.commit()
             return Response(reply_text=None)
 
