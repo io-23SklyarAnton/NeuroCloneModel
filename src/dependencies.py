@@ -1,4 +1,7 @@
+from typing import Iterable
+
 from dishka import Provider, Scope, provide
+from sqlalchemy.orm import sessionmaker
 
 from bot_operations.application.features import (
     AssignNeuroCloneToBotCommandHandler,
@@ -11,10 +14,12 @@ from bot_operations.application.interfaces import (
     IUnitOfWork as BotOpsUoW,
     PersonaReplyService,
 )
-from bot_operations.infrastructure.dummy_bot_runner import DummyBotRunnerService
-from bot_operations.infrastructure.in_memory.uow import (
-    InMemoryUnitOfWork as BotOpsInMemoryUoW,
+from bot_operations.infrastructure.db import (
+    SqlAlchemyUnitOfWork as BotOpsSqlAlchemyUoW,
 )
+from bot_operations.infrastructure.dummy_bot_runner import DummyBotRunnerService
+from common.application.interfaces import IEventBus
+from common.infrastructure.db.utils import get_session_maker
 from constants import BASE_PATH
 from data_preparation.application.features import (
     BuildImitationDatasetCommandHandler,
@@ -26,15 +31,14 @@ from data_preparation.application.interfaces import (
     IStorage,
     IUnitOfWork as DataPrepUoW,
 )
-from data_preparation.infrastructure.in_memory.uow import (
-    InMemoryUnitOfWork as DataPrepInMemoryUoW,
+from data_preparation.infrastructure.db import (
+    SqlAlchemyUnitOfWork as DataPrepSqlAlchemyUoW,
 )
 from data_preparation.infrastructure.local.storage import LocalStorage
 from iam.application.features import RegisterUserCommandHandler
 from iam.application.interfaces import IUnitOfWork as IamUoW
-from iam.infrastructure.in_memory.uow import (
-    InMemoryUnitOfWork as IamInMemoryUoW,
-)
+from iam.infrastructure.db import SqlAlchemyUnitOfWork as IamSqlAlchemyUoW
+from infrastructure.celery.event_bus import CeleryEventBus
 from infrastructure.llm import IInferenceEngine
 from model_engine.application.features import (
     CreateNeuroCloneCommandHandler,
@@ -46,12 +50,20 @@ from model_engine.application.interfaces import (
 from model_engine.application.services import (
     PersonaInferenceService,
 )
-from model_engine.infrastructure.in_memory.uow import (
-    InMemoryUnitOfWork as ModelEngineInMemoryUoW,
+from model_engine.infrastructure.db import (
+    SqlAlchemyUnitOfWork as ModelEngineSqlAlchemyUoW,
 )
 
 
 class AppProvider(Provider):
+    @provide(scope=Scope.APP)
+    def get_session_maker(self) -> sessionmaker:
+        return get_session_maker()
+
+    @provide(scope=Scope.APP)
+    def get_event_bus(self) -> IEventBus:
+        return CeleryEventBus()
+
     @provide(scope=Scope.APP)
     def get_bot_runner(self) -> IBotRunnerService:
         return DummyBotRunnerService()
@@ -63,20 +75,24 @@ class AppProvider(Provider):
         )
 
     @provide(scope=Scope.REQUEST)
-    def get_iam_uow(self) -> IamUoW:
-        return IamInMemoryUoW()
+    def get_iam_uow(self, session_maker: sessionmaker) -> Iterable[IamUoW]:
+        with IamSqlAlchemyUoW(session_factory=session_maker) as uow:
+            yield uow
 
     @provide(scope=Scope.REQUEST)
-    def get_bot_ops_uow(self) -> BotOpsUoW:
-        return BotOpsInMemoryUoW()
+    def get_bot_ops_uow(self, session_maker: sessionmaker) -> Iterable[BotOpsUoW]:
+        with BotOpsSqlAlchemyUoW(session_factory=session_maker) as uow:
+            yield uow
 
     @provide(scope=Scope.REQUEST)
-    def get_data_prep_uow(self) -> DataPrepUoW:
-        return DataPrepInMemoryUoW()
+    def get_data_prep_uow(self, session_maker: sessionmaker) -> Iterable[DataPrepUoW]:
+        with DataPrepSqlAlchemyUoW(session_factory=session_maker) as uow:
+            yield uow
 
     @provide(scope=Scope.REQUEST)
-    def get_model_engine_uow(self) -> ModelEngineUoW:
-        return ModelEngineInMemoryUoW()
+    def get_model_engine_uow(self, session_maker: sessionmaker) -> Iterable[ModelEngineUoW]:
+        with ModelEngineSqlAlchemyUoW(session_factory=session_maker) as uow:
+            yield uow
 
     @provide(scope=Scope.REQUEST)
     def get_persona_reply_service(
