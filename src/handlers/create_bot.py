@@ -32,6 +32,7 @@ _CALLBACK_TARGET_USER_PREFIX: str = "create_bot:target_user:"
 _FSM_KEY_BOT_NAME: str = "bot_name"
 _FSM_KEY_BOT_TOKEN: str = "bot_token"
 _FSM_KEY_TARGET_CANDIDATES: str = "target_candidates"
+_FSM_KEY_CHAT_EXPORT_ID: str = "chat_export_id"
 
 
 class CreateBotStates(StatesGroup):
@@ -93,40 +94,35 @@ async def handle_chat_export_file(
         message: Message,
         state: FSMContext,
         aiogram_bot: AiogramBot,
-        create_chat_export_handler: FromDishka[CreateChatExportCommandHandler],
 ) -> None:
+    message_document = message.document
     if message.from_user is None:
         raise MissingUserException()
-    if message.document is None:
-        await message.answer("Document is required. Please send the chat export file (JSON) that the bot will be based on:")
+    if message_document is None:
+        await message.answer(
+            "Document is required. Please send the chat export file (JSON) that the bot will be based on:")
         return
 
     file_buffer: BytesIO = BytesIO()
-    await aiogram_bot.download(file=message.document.file_id, destination=file_buffer)
+    await aiogram_bot.download(file=message_document.file_id, destination=file_buffer)
     file_buffer.seek(0)
 
     raw_bytes: bytes = file_buffer.getvalue()
     parsed_data: Optional[dict[str, Any]] = _try_parse_json(raw_bytes)
     if parsed_data is None:
-        await message.answer("Failed to parse the file. Please make sure it's a valid JSON file exported from Telegram and send it again:")
+        await message.answer(
+            "Failed to parse the file. Please make sure it's a valid JSON file exported from Telegram and send it again:")
         return
 
     unique_senders: list[str] = _extract_unique_senders(parsed_data)
     if not unique_senders:
-        await message.answer("Couldn't find any valid senders in the chat export. Please make sure the file is correct and try again:")
-        return
-
-    file_buffer.seek(0)
-    create_export_response = await create_chat_export_handler.handle(CreateChatExportCommand(
-        owner_id=OwnerTelegramID(value=message.from_user.id),
-        file_bytes=file_buffer,
-    ))
-    if create_export_response.chat_export_id is None:
-        await message.answer(create_export_response.message)
+        await message.answer(
+            "Couldn't find any valid senders in the chat export. Please make sure the file is correct and try again:")
         return
 
     await state.update_data({
         _FSM_KEY_TARGET_CANDIDATES: unique_senders,
+        _FSM_KEY_CHAT_EXPORT_ID: message_document.file_id,
     })
 
     keyboard: InlineKeyboardMarkup = _build_target_user_keyboard(unique_senders)
@@ -146,7 +142,9 @@ async def handle_chat_export_file(
 async def handle_target_user_selection(
         callback: CallbackQuery,
         state: FSMContext,
+        aiogram_bot: AiogramBot,
         create_bot_handler: FromDishka[CreateBotCommandHandler],
+        create_chat_export_handler: FromDishka[CreateChatExportCommandHandler],
 ) -> None:
     if callback.from_user is None:
         raise MissingUserException()
@@ -163,21 +161,34 @@ async def handle_target_user_selection(
         await callback.answer("Invalid selection", show_alert=False)
         return
 
-    target_user_name: str = candidates[selected_index]
+    target_user_name = UserName(value=candidates[selected_index])
     bot_name: str = state_data[_FSM_KEY_BOT_NAME]
     bot_token: str = state_data[_FSM_KEY_BOT_TOKEN]
     owner_telegram_id: int = callback.from_user.id
+
+    file_id = state_data[_FSM_KEY_CHAT_EXPORT_ID]
+    file_buffer = BytesIO()
+    await aiogram_bot.download(file=file_id, destination=file_buffer)
+    file_buffer.seek(0)
+
+    create_export_response = await create_chat_export_handler.handle(CreateChatExportCommand(
+        owner_id=OwnerTelegramID(value=owner_telegram_id),
+        file_bytes=file_buffer,
+        target_user_name=target_user_name,
+    ))
+    if create_export_response.chat_export_id is None:
+        await callback.answer(create_export_response.message)
+        return
 
     bot_response = await create_bot_handler.handle(CreateBotCommand(
         owner_id=OwnerTelegramID(value=owner_telegram_id),
         bot_name=Bot.Name(value=bot_name),
         bot_token=Bot.Token(value=bot_token),
-        target_user_name=UserName(value=target_user_name),
     ))
 
     if isinstance(callback.message, Message):
         await callback.message.edit_reply_markup(reply_markup=None)
-        await callback.message.answer(bot_response.message)
+        await callback.answer(bot_response.message)
     await callback.answer()
     await state.clear()
 

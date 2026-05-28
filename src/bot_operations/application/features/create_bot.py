@@ -17,7 +17,6 @@ class Command(ICommand):
     owner_id: OwnerTelegramID
     bot_name: Bot.Name
     bot_token: Bot.Token
-    target_user_name: UserName
 
 
 class CommandHandler:
@@ -52,6 +51,5 @@ class CommandHandler:
         return Response(
             message=(
                 f"Bot «{bot.name.value}» registered as {bot.status.value}. "
-                f"Neuroclone for «{command.target_user_name.value}» will be bound once training completes."
             ),
         )
