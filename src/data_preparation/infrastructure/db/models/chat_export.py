@@ -26,7 +26,11 @@ class ChatExport(Base):
         String,
         nullable=False,
     )
-    export_file_key: Mapped[str] = mapped_column(
+    file_bucket: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+    file_key: Mapped[str] = mapped_column(
         String,
         nullable=False,
     )

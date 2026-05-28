@@ -3,13 +3,13 @@ __all__ = [
     "CommandHandler",
 ]
 
-from pathlib import Path
-
 from common.application.base import ICommand, Response
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, FileReference
 from infrastructure.llm import IInferenceEngine
 from model_engine.application.interfaces import IUnitOfWork
 from model_engine.domain.entities import NeuroClone
+
+_ADAPTERS_BUCKET = "adapters"
 
 
 class Command(ICommand):
@@ -34,12 +34,12 @@ class CommandHandler:
         self._uow.neuroclone.update(neuroclone)
         await self._uow.commit()
 
-        adapter_path: str = self._build_adapter_path(neuroclone_id=neuroclone.id)
+        adapter_file_reference: FileReference = self._build_adapter_file_reference(neuroclone_id=neuroclone.id)
 
         try:
             await self._inference_engine.train_lora(
-                train_data_path=str(neuroclone.dataset_file_key),
-                adapter_path=adapter_path,
+                train_data_path=neuroclone.dataset_file_reference.full_path,
+                adapter_path=adapter_file_reference.full_path,
             )
         except Exception as exc:
             neuroclone.mark_failed()
@@ -49,7 +49,7 @@ class CommandHandler:
                 message=f"NeuroClone {neuroclone.id.value} training failed: {exc}",
             )
 
-        neuroclone.set_adapter_path(NeuroClone.AdapterPath(value=str(adapter_path)))
+        neuroclone.set_adapter_file_reference(adapter_file_reference)
         neuroclone.mark_ready()
         self._uow.neuroclone.update(neuroclone)
         await self._uow.commit()
@@ -58,7 +58,9 @@ class CommandHandler:
             message=f"NeuroClone {neuroclone.id.value} is now {neuroclone.status.value}.",
         )
 
-    def _build_adapter_path(self, neuroclone_id: ID) -> str:
-        base_path = Path("/adapters")
-        adapter_file_name = f"{neuroclone_id.value}.safetensors"
-        return str(base_path / adapter_file_name)
+    @staticmethod
+    def _build_adapter_file_reference(neuroclone_id: ID) -> FileReference:
+        return FileReference(
+            bucket=_ADAPTERS_BUCKET,
+            key=f"{neuroclone_id.value}.safetensors",
+        )

@@ -11,11 +11,10 @@ import jinja2
 import pydantic
 
 from common.application.base import ICommand, Response
-from common.domain.value_objects import UserName
+from common.domain.value_objects import UserName, FileReference
 from data_preparation.application import constants
 from data_preparation.application.interfaces import IStorage, IUnitOfWork
 from data_preparation.domain.entities import ChatExport, ParsedMessage, TrainingDataset
-from data_preparation.domain.value_objects import DatasetFileKey
 from utils import get_now_datetime
 
 
@@ -57,7 +56,7 @@ class CommandHandler:
         )
 
         system_prompt: str = self._build_system_prompt(command.target_user)
-        file_key: DatasetFileKey = self._make_file_key(command.chat_export_id)
+        file_reference: FileReference = self._make_file_reference(command.chat_export_id)
         content: BytesIO = self._serialize_dataset(
             dataset=pairs,
             system_prompt=system_prompt,
@@ -65,14 +64,14 @@ class CommandHandler:
 
         await self._storage.save(
             file_object=content,
-            file_name=str(file_key),
+            file_reference=file_reference,
         )
 
         dataset: TrainingDataset = TrainingDataset.create(
             owner_id=chat_export.owner_id,
             target_user=chat_export.target_user_name,
             source_chat_export_id=chat_export.id,
-            file_key=file_key,
+            file_reference=file_reference,
             n_pairs=len(pairs),
             built_at=get_now_datetime(),
         )
@@ -173,10 +172,13 @@ class CommandHandler:
         ]
         return BytesIO("\n".join(lines).encode("utf-8"))
 
-    @staticmethod
-    def _make_file_key(chat_export_id: ChatExport.ChatID) -> DatasetFileKey:
+    @classmethod
+    def _make_file_reference(cls, chat_export_id: ChatExport.ChatID) -> FileReference:
         timestamp: str = get_now_datetime().strftime("%Y%m%d_%H%M%S")
-        return DatasetFileKey(value=f"{chat_export_id.value}_{timestamp}.jsonl")
+        return FileReference(
+            bucket=cls._BUCKET_NAME,
+            key=f"{chat_export_id.value}_{timestamp}.jsonl",
+        )
 
     @staticmethod
     def _build_system_prompt(target_user: UserName) -> str:

@@ -3,6 +3,7 @@ __all__ = [
     "ValueObject",
     "UserName",
     "OwnerTelegramID",
+    "FileReference",
 ]
 
 import abc
@@ -60,3 +61,21 @@ class OwnerTelegramID(ValueObject):
 
     def __hash__(self) -> int:
         return hash(self.value)
+
+
+class FileReference(ValueObject):
+    bucket: str
+    key: str
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FileReference):
+            return False
+
+        return self.bucket == other.bucket and self.key == other.key
+
+    def __hash__(self) -> int:
+        return hash((self.bucket, self.key))
+
+    @property
+    def full_path(self) -> str:
+        return f"{self.bucket}/{self.key}"

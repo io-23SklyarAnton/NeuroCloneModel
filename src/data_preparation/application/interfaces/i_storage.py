@@ -2,7 +2,8 @@ __all__ = ["IStorage"]
 
 import abc
 from io import BytesIO
-from typing import Optional
+
+from common.domain.value_objects import FileReference
 
 
 class IStorage(abc.ABC):
@@ -10,18 +11,17 @@ class IStorage(abc.ABC):
     async def save(
             self,
             file_object: BytesIO,
-            file_name: str,
-            extra_args: Optional[dict] = None,
+            file_reference: FileReference,
     ) -> str: ...
 
     @abc.abstractmethod
     async def load(
             self,
-            file_name: str,
+            file_reference: FileReference,
     ) -> bytes: ...
 
     @abc.abstractmethod
     async def exists(
             self,
-            file_name: str,
+            file_reference: FileReference,
     ) -> bool: ...

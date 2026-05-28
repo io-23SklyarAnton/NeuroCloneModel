@@ -58,7 +58,7 @@ class PersonaInferenceService:
         neuroclone: Optional[NeuroClone] = await self._uow.neuroclone.get_by_id_optional(
             ID(value=neuroclone_id),
         )
-        if neuroclone is None or not neuroclone.is_ready or neuroclone.adapter_path is None:
+        if neuroclone is None or not neuroclone.is_ready or neuroclone.adapter_file_reference is None:
             return None
 
         user_prompt: str = self._build_user_prompt(context)
@@ -69,7 +69,7 @@ class PersonaInferenceService:
         return await self._inference_engine.generate_async(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            lora_path=neuroclone.adapter_path.value,
+            lora_path=neuroclone.adapter_file_reference.full_path,
             max_tokens=self._max_tokens,
             temp=self._temperature,
             priority=self._priority,

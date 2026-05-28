@@ -28,6 +28,10 @@ class NeuroClone(Base):
         String,
         nullable=False,
     )
+    dataset_file_bucket: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
     dataset_file_key: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -36,7 +40,11 @@ class NeuroClone(Base):
         Enum(NeuroCloneAggregate.Status, name="neuroclone_status"),
         nullable=False,
     )
-    adapter_path: Mapped[Optional[str]] = mapped_column(
+    adapter_file_bucket: Mapped[Optional[str]] = mapped_column(
+        String,
+        nullable=True,
+    )
+    adapter_file_key: Mapped[Optional[str]] = mapped_column(
         String,
         nullable=True,
     )

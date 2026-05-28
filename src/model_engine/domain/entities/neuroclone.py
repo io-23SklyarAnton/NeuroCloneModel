@@ -7,7 +7,7 @@ from typing import Optional, Self
 from pydantic import model_validator
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, ValueObject, OwnerTelegramID
+from common.domain.value_objects import ID, UserName, ValueObject, OwnerTelegramID, FileReference
 
 
 class NeuroClone(Aggregate):
@@ -16,28 +16,6 @@ class NeuroClone(Aggregate):
         TRAINING = "TRAINING"
         READY = "READY"
         FAILED = "FAILED"
-
-    class DatasetFileKey(ValueObject):
-        value: str
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, NeuroClone.DatasetFileKey)
-
-            return self.value == other.value
-
-        def __str__(self) -> str:
-            return self.value
-
-    class AdapterPath(ValueObject):
-        value: str
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, NeuroClone.AdapterPath)
-
-            return self.value == other.value
-
-        def __str__(self) -> str:
-            return self.value
 
     class ReplyPeriod(ValueObject):
         value: int
@@ -84,18 +62,18 @@ class NeuroClone(Aggregate):
             id_: ID,
             owner_id: OwnerTelegramID,
             target_user_name: UserName,
-            dataset_file_key: Optional[DatasetFileKey],
+            dataset_file_reference: Optional[FileReference],
             status: Status,
-            adapter_path: Optional[AdapterPath],
+            adapter_file_reference: Optional[FileReference],
             reply_period: Optional[ReplyPeriod],
     ) -> None:
         super().__init__()
         self._id = id_
         self._owner_id = owner_id
         self._target_user_name = target_user_name
-        self._dataset_file_key = dataset_file_key
+        self._dataset_file_reference = dataset_file_reference
         self._status = status
-        self._adapter_path = adapter_path
+        self._adapter_file_reference = adapter_file_reference
         self._reply_period = reply_period
 
     @property
@@ -111,16 +89,16 @@ class NeuroClone(Aggregate):
         return self._target_user_name
 
     @property
-    def dataset_file_key(self) -> Optional[DatasetFileKey]:
-        return self._dataset_file_key
+    def dataset_file_reference(self) -> Optional[FileReference]:
+        return self._dataset_file_reference
 
     @property
     def status(self) -> Status:
         return self._status
 
     @property
-    def adapter_path(self) -> Optional[AdapterPath]:
-        return self._adapter_path
+    def adapter_file_reference(self) -> Optional[FileReference]:
+        return self._adapter_file_reference
 
     @property
     def reply_period(self) -> Optional[ReplyPeriod]:
@@ -135,15 +113,15 @@ class NeuroClone(Aggregate):
             cls,
             owner_id: OwnerTelegramID,
             target_user_name: UserName,
-            dataset_file_key: DatasetFileKey,
+            dataset_file_reference: FileReference,
     ) -> "NeuroClone":
         neuroclone = NeuroClone(
             id_=ID(value=uuid.uuid4()),
             owner_id=owner_id,
             target_user_name=target_user_name,
-            dataset_file_key=dataset_file_key,
+            dataset_file_reference=dataset_file_reference,
             status=cls.Status.PREPARING,
-            adapter_path=None,
+            adapter_file_reference=None,
             reply_period=None,
         )
 
@@ -161,9 +139,9 @@ class NeuroClone(Aggregate):
 
         self._status = self.Status.TRAINING
 
-    def set_adapter_path(
+    def set_adapter_file_reference(
             self,
-            adapter_path: AdapterPath,
+            adapter_file_reference: FileReference,
     ) -> None:
         if self._status != self.Status.TRAINING:
             raise NeuroClone.IllegalStateTransitionError(
@@ -171,11 +149,12 @@ class NeuroClone(Aggregate):
                 requested=self.Status.TRAINING,
             )
 
-        if self._adapter_path is not None:
+        if self._adapter_file_reference is not None:
             raise RuntimeError(
-                f"Adapter path is already set for NeuroClone {self._id.value}: {self._adapter_path.value}",
+                f"Adapter file reference is already set for NeuroClone {self._id.value}: "
+                f"{self._adapter_file_reference.full_path}",
             )
-        self._adapter_path = adapter_path
+        self._adapter_file_reference = adapter_file_reference
 
     def mark_ready(self) -> None:
         if self._status not in {self.Status.PREPARING, self.Status.TRAINING}:

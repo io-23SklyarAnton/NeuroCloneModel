@@ -3,8 +3,7 @@ __all__ = ["ChatExport"]
 from enum import StrEnum
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ValueObject, UserName, OwnerTelegramID
-from data_preparation.domain.value_objects import ExportFileKey
+from common.domain.value_objects import ValueObject, UserName, OwnerTelegramID, FileReference
 
 
 class ChatExport(Aggregate):
@@ -35,7 +34,7 @@ class ChatExport(Aggregate):
 
     class EventChatExportCreated(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):
-            export_file_key: ExportFileKey
+            file_reference: FileReference
 
     class EventChatExportIngested(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):
@@ -54,7 +53,7 @@ class ChatExport(Aggregate):
             chat_id: ChatID,
             owner_id: OwnerTelegramID,
             target_user_name: UserName,
-            export_file_key: ExportFileKey,
+            file_reference: FileReference,
             status: Status,
             n_messages: int,
     ):
@@ -62,7 +61,7 @@ class ChatExport(Aggregate):
         self._chat_id = chat_id
         self._owner_id = owner_id
         self._target_user_name = target_user_name
-        self._export_file_key = export_file_key
+        self._file_reference = file_reference
         self._status = status
         self._n_messages = n_messages
 
@@ -83,8 +82,8 @@ class ChatExport(Aggregate):
         return self._target_user_name
 
     @property
-    def export_file_key(self) -> ExportFileKey:
-        return self._export_file_key
+    def file_reference(self) -> FileReference:
+        return self._file_reference
 
     @property
     def status(self) -> Status:
@@ -100,20 +99,20 @@ class ChatExport(Aggregate):
             chat_id: ChatID,
             owner_id: OwnerTelegramID,
             target_user_name: UserName,
-            export_file_key: ExportFileKey,
+            file_reference: FileReference,
     ) -> "ChatExport":
         chat_export = cls(
             chat_id=chat_id,
             owner_id=owner_id,
             target_user_name=target_user_name,
-            export_file_key=export_file_key,
+            file_reference=file_reference,
             status=cls.Status.PENDING,
             n_messages=0,
         )
         chat_export._events_to_publish.append(cls.EventChatExportCreated(
             object_id=str(chat_export.id.value),
             payload=cls.EventChatExportCreated.Payload(
-                export_file_key=export_file_key,
+                file_reference=file_reference,
             ),
         ))
         return chat_export

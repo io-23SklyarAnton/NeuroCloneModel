@@ -6,12 +6,11 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID, UserName, OwnerTelegramID
+from common.domain.value_objects import ID, UserName, OwnerTelegramID, FileReference
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from data_preparation.application.interfaces.repositories import ITrainingDatasetRepository
 from data_preparation.domain.entities import ChatExport, TrainingDataset as TrainingDatasetAggregate
-from data_preparation.domain.value_objects import DatasetFileKey
 from data_preparation.infrastructure.db.models import TrainingDataset as DBTrainingDataset
 
 
@@ -64,7 +63,8 @@ class TrainingDatasetRepository(
             owner_telegram_id=aggregate.owner_id.value,
             target_user=aggregate.target_user.value,
             source_chat_export_id=aggregate.source_chat_export_id.value,
-            file_key=aggregate.file_key.value,
+            file_bucket=aggregate.file_reference.bucket,
+            file_key=aggregate.file_reference.key,
             n_pairs=aggregate.n_pairs,
             built_at=aggregate.built_at.replace(tzinfo=None),
         )
@@ -78,7 +78,10 @@ class TrainingDatasetRepository(
             owner_id=OwnerTelegramID(value=db_model.owner_telegram_id),
             target_user=UserName(value=db_model.target_user),
             source_chat_export_id=ChatExport.ChatID(value=db_model.source_chat_export_id),
-            file_key=DatasetFileKey(value=db_model.file_key),
+            file_reference=FileReference(
+                bucket=db_model.file_bucket,
+                key=db_model.file_key,
+            ),
             n_pairs=db_model.n_pairs,
             built_at=db_model.built_at,
         )

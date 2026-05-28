@@ -11,10 +11,11 @@ from typing import Optional
 import pydantic
 
 from common.application.base import ICommand
-from common.domain.value_objects import UserName, OwnerTelegramID
+from common.domain.value_objects import UserName, OwnerTelegramID, FileReference
 from data_preparation.application.interfaces import IStorage, IUnitOfWork
 from data_preparation.domain.entities import ChatExport
-from data_preparation.domain.value_objects import ExportFileKey
+
+_BUCKET_NAME = "chat-exports"
 
 
 class Command(ICommand):
@@ -27,7 +28,7 @@ class Command(ICommand):
 
 class Response(pydantic.BaseModel):
     chat_export_id: Optional[int]
-    chat_export_file_key: Optional[str]
+    chat_export_file_path: Optional[str]
     message: str
 
 
@@ -48,7 +49,7 @@ class CommandHandler:
         if chat_id is None:
             return Response(
                 chat_export_id=None,
-                chat_export_file_key=None,
+                chat_export_file_path=None,
                 message="Invalid chat export file.",
             )
 
@@ -56,29 +57,29 @@ class CommandHandler:
         if existing is not None:
             return Response(
                 chat_export_id=existing.chat_id.value,
-                chat_export_file_key=existing.export_file_key.value,
+                chat_export_file_path=existing.file_reference.full_path,
                 message="Chat export with this chat id already exists.",
             )
 
-        export_file_key: ExportFileKey = self._build_export_file_key(chat_id)
+        file_reference: FileReference = self._build_file_reference(chat_id)
 
         await self._storage.save(
             file_object=command.file_bytes,
-            file_name=str(export_file_key),
+            file_reference=file_reference,
         )
 
         chat_export: ChatExport = ChatExport.create(
             chat_id=chat_id,
             owner_id=command.owner_id,
             target_user_name=command.target_user_name,
-            export_file_key=export_file_key,
+            file_reference=file_reference,
         )
         self._uow.chat_export.create(chat_export)
         await self._uow.commit()
 
         return Response(
             chat_export_id=chat_id.value,
-            chat_export_file_key=export_file_key.value,
+            chat_export_file_path=file_reference.full_path,
             message=f"Chat export {chat_id.value} is now {chat_export.status.value}.",
         )
 
@@ -94,8 +95,11 @@ class CommandHandler:
         except Exception:
             return None
 
-    def _build_export_file_key(
-            self,
+    @staticmethod
+    def _build_file_reference(
             chat_id: ChatExport.ChatID,
-    ) -> ExportFileKey:
-        return ExportFileKey(value=f"chat-exports/{chat_id.value}.json")
+    ) -> FileReference:
+        return FileReference(
+            bucket=_BUCKET_NAME,
+            key=f"{chat_id.value}.json",
+        )

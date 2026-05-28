@@ -3,9 +3,8 @@ __all__ = ["TrainingDataset"]
 from datetime import datetime
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, OwnerTelegramID
+from common.domain.value_objects import ID, UserName, OwnerTelegramID, FileReference
 from data_preparation.domain.entities.chat_export import ChatExport
-from data_preparation.domain.value_objects import DatasetFileKey
 
 
 class TrainingDataset(Aggregate):
@@ -13,7 +12,7 @@ class TrainingDataset(Aggregate):
         class Payload(Aggregate.IDomainEvent.Payload):
             owner_telegram_id: int
             target_user_name: str
-            dataset_file_key: str
+            file_reference: FileReference
             source_chat_export_id: int
             n_pairs: int
 
@@ -23,7 +22,7 @@ class TrainingDataset(Aggregate):
             owner_id: OwnerTelegramID,
             target_user: UserName,
             source_chat_export_id: ChatExport.ChatID,
-            file_key: DatasetFileKey,
+            file_reference: FileReference,
             n_pairs: int,
             built_at: datetime,
     ):
@@ -32,7 +31,7 @@ class TrainingDataset(Aggregate):
         self._owner_id = owner_id
         self._target_user = target_user
         self._source_chat_export_id = source_chat_export_id
-        self._file_key = file_key
+        self._file_reference = file_reference
         self._n_pairs = n_pairs
         self._built_at = built_at
 
@@ -53,8 +52,8 @@ class TrainingDataset(Aggregate):
         return self._source_chat_export_id
 
     @property
-    def file_key(self) -> DatasetFileKey:
-        return self._file_key
+    def file_reference(self) -> FileReference:
+        return self._file_reference
 
     @property
     def n_pairs(self) -> int:
@@ -70,7 +69,7 @@ class TrainingDataset(Aggregate):
             owner_id: OwnerTelegramID,
             target_user: UserName,
             source_chat_export_id: ChatExport.ChatID,
-            file_key: DatasetFileKey,
+            file_reference: FileReference,
             n_pairs: int,
             built_at: datetime,
     ) -> "TrainingDataset":
@@ -79,7 +78,7 @@ class TrainingDataset(Aggregate):
             owner_id=owner_id,
             target_user=target_user,
             source_chat_export_id=source_chat_export_id,
-            file_key=file_key,
+            file_reference=file_reference,
             n_pairs=n_pairs,
             built_at=built_at,
         )
@@ -88,7 +87,7 @@ class TrainingDataset(Aggregate):
             payload=cls.EventDatasetBuilt.Payload(
                 owner_telegram_id=owner_id.value,
                 target_user_name=target_user.value,
-                dataset_file_key=file_key.value,
+                file_reference=file_reference,
                 source_chat_export_id=source_chat_export_id.value,
                 n_pairs=n_pairs,
             ),

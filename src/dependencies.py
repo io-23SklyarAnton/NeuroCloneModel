@@ -58,7 +58,6 @@ class AppProvider(Provider):
     def get_storage(self) -> IStorage:
         return LocalStorage(
             base_path=BASE_PATH.parent / "storage",
-            bucket_name="chat-exports",
         )
 
     @provide(scope=Scope.REQUEST)

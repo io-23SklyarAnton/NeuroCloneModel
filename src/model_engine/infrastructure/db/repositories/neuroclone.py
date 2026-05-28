@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID, UserName, OwnerTelegramID
+from common.domain.value_objects import ID, UserName, OwnerTelegramID, FileReference
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from model_engine.application.interfaces.repositories import INeuroCloneRepository
@@ -47,20 +47,26 @@ class NeuroCloneRepository(
             self,
             aggregate: NeuroCloneAggregate,
     ) -> DBNeuroClone:
+        adapter_file_reference: Optional[FileReference] = aggregate.adapter_file_reference
         return DBNeuroClone(
             id=aggregate.id.value,
             owner_telegram_id=aggregate.owner_id.value,
             target_user_name=aggregate.target_user_name.value,
-            dataset_file_key=aggregate.dataset_file_key.value,
+            dataset_file_bucket=aggregate.dataset_file_reference.bucket,
+            dataset_file_key=aggregate.dataset_file_reference.key,
             status=aggregate.status,
-            adapter_path=(
-                aggregate.adapter_path.value
-                if aggregate.adapter_path is not None else None
+            adapter_file_bucket=(
+                adapter_file_reference.bucket
+                if adapter_file_reference is not None else None
+            ),
+            adapter_file_key=(
+                adapter_file_reference.key
+                if adapter_file_reference is not None else None
             ),
             reply_period=(
                 aggregate.reply_period.value
                 if aggregate.reply_period is not None else None
-            )
+            ),
         )
 
     def from_db_model_to_aggregate(
@@ -71,11 +77,19 @@ class NeuroCloneRepository(
             id_=ID(value=db_model.id),
             owner_id=OwnerTelegramID(value=db_model.owner_telegram_id),
             target_user_name=UserName(value=db_model.target_user_name),
-            dataset_file_key=NeuroCloneAggregate.DatasetFileKey(value=db_model.dataset_file_key),
+            dataset_file_reference=FileReference(
+                bucket=db_model.dataset_file_bucket,
+                key=db_model.dataset_file_key,
+            ),
             status=db_model.status,
-            adapter_path=(
-                NeuroCloneAggregate.AdapterPath(value=db_model.adapter_path)
-                if db_model.adapter_path is not None else None
+            adapter_file_reference=(
+                FileReference(
+                    bucket=db_model.adapter_file_bucket,
+                    key=db_model.adapter_file_key,
+                )
+                if db_model.adapter_file_bucket is not None
+                and db_model.adapter_file_key is not None
+                else None
             ),
             reply_period=(
                 NeuroCloneAggregate.ReplyPeriod(value=db_model.reply_period)

@@ -11,7 +11,7 @@ from common.application.base import ICommand
 from common.domain.value_objects import ID, UserName
 from data_preparation.application.interfaces import IStorage, IUnitOfWork
 from data_preparation.domain.entities import ChatExport, ParsedMessage
-from data_preparation.domain.value_objects import DateUnixtime, ExportFileKey
+from data_preparation.domain.value_objects import DateUnixtime
 
 _ExternalIdMap = dict[int, ID]
 _PERSIST_BATCH_SIZE = 1000
@@ -45,7 +45,7 @@ class CommandHandler:
     ) -> None:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
         raw_bytes = await self._storage.load(
-            file_name=chat_export.export_file_key.value,
+            file_reference=chat_export.file_reference,
         )
         data = json.loads(raw_bytes)
 
@@ -241,12 +241,11 @@ if __name__ == "__main__":
     uow = InMemoryUnitOfWork()
     storage = LocalStorage(
         base_path=_BASE_DIR / "eval" / "data",
-        bucket_name="raw_chat_exports",
     )
 
     ingest_handler = CommandHandler(
         uow=uow,
         storage=storage,
     )
-    command = Command(export_file_key=ExportFileKey(value="result.json"))
+    command = Command(chat_export_id=ChatExport.ChatID(value=1))
     asyncio.run(ingest_handler.handle(command))
