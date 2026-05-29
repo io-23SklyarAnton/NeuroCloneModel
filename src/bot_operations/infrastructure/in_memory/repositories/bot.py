@@ -32,3 +32,20 @@ class InMemoryBotRepository(InMemoryBaseRepository[Bot], IBotRepository):
 
     async def get_by_owner_id(self, owner_id: OwnerTelegramID) -> list[Bot]:
         return [bot for bot in self._storage.values() if bot.owner_id == owner_id]
+
+    async def get_by_owner_id_without_neuroclone(
+            self,
+            owner_id: OwnerTelegramID,
+    ) -> Optional[Bot]:
+        for bot in self._storage.values():
+            if bot.owner_id == owner_id and bot.neuroclone_id is None:
+                return bot
+
+        return None
+
+    async def get_all_running(self) -> list[Bot]:
+        return [
+            bot
+            for bot in self._storage.values()
+            if bot.status == Bot.BotStatus.RUNNING
+        ]

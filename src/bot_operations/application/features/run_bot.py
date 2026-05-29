@@ -5,10 +5,7 @@ __all__ = [
 
 from typing import Optional
 
-from bot_operations.application.interfaces import (
-    IBotRunnerService,
-    IUnitOfWork,
-)
+from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand, Response
 from common.domain.value_objects import ID
@@ -22,10 +19,8 @@ class CommandHandler:
     def __init__(
             self,
             uow: IUnitOfWork,
-            bot_runner: IBotRunnerService,
     ) -> None:
         self._uow = uow
-        self._bot_runner = bot_runner
 
     async def handle(
             self,
@@ -37,17 +32,12 @@ class CommandHandler:
 
         try:
             bot.start_bot()
-        except Bot.NeuroCloneNotReadyError as e:
-            return Response(message=str(e))
+        except Bot.NeuroCloneNotReadyError as exc:
+            return Response(message=str(exc))
         except Bot.IllegalStateTransitionError:
             return Response(message=f"Bot «{bot.name.value}» is already running.")
-
-        await self._bot_runner.start(
-            bot_id=bot.id,
-            token=bot.token,
-        )
 
         self._uow.bot.update(bot)
         await self._uow.commit()
 
-        return Response(message=f"Bot «{bot.name.value}» started successfully.")
+        return Response(message=f"Bot «{bot.name.value}» marked as running.")

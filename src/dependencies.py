@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Optional
 
 from dishka import Provider, Scope, provide
 from sqlalchemy.orm import sessionmaker
@@ -14,10 +14,10 @@ from bot_operations.application.interfaces import (
     IUnitOfWork as BotOpsUoW,
     PersonaReplyService,
 )
+from bot_operations.infrastructure.aiogram_bot_runner import AiogramBotRunnerService
 from bot_operations.infrastructure.db import (
     SqlAlchemyUnitOfWork as BotOpsSqlAlchemyUoW,
 )
-from bot_operations.infrastructure.dummy_bot_runner import DummyBotRunnerService
 from common.application.interfaces import IEventBus
 from common.infrastructure.db.utils import get_session_maker
 from constants import BASE_PATH
@@ -56,6 +56,13 @@ from model_engine.infrastructure.db import (
 
 
 class AppProvider(Provider):
+    def __init__(
+            self,
+            bot_runner: Optional[IBotRunnerService] = None,
+    ) -> None:
+        super().__init__()
+        self._bot_runner: IBotRunnerService = bot_runner or AiogramBotRunnerService()
+
     @provide(scope=Scope.APP)
     def get_session_maker(self) -> sessionmaker:
         return get_session_maker()
@@ -66,7 +73,7 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def get_bot_runner(self) -> IBotRunnerService:
-        return DummyBotRunnerService()
+        return self._bot_runner
 
     @provide(scope=Scope.APP)
     def get_storage(self) -> IStorage:
@@ -123,12 +130,8 @@ class AppProvider(Provider):
     def get_run_bot_handler(
             self,
             uow: BotOpsUoW,
-            bot_runner: IBotRunnerService,
     ) -> RunBotCommandHandler:
-        return RunBotCommandHandler(
-            uow=uow,
-            bot_runner=bot_runner,
-        )
+        return RunBotCommandHandler(uow=uow)
 
     @provide(scope=Scope.REQUEST)
     def get_receive_chat_message_handler(

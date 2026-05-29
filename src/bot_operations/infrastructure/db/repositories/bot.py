@@ -74,6 +74,13 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
         db_bot: Optional[DBBot] = query.first()
         return self.get_optional(db_bot)
 
+    async def get_all_running(self) -> list[BotAggregate]:
+        query: Query = self.base_query()
+        query = query.filter(self.model.status == BotAggregate.BotStatus.RUNNING)
+
+        db_bots: list[DBBot] = query.all()
+        return self.get_all(db_bots)
+
     def from_aggregate_to_db_model(
             self,
             aggregate: BotAggregate,

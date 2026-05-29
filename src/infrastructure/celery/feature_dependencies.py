@@ -1,7 +1,6 @@
 __all__ = [
     "build_storage",
     "build_inference_engine",
-    "build_bot_runner",
     "build_ingest_chat_export_handler",
     "build_process_chat_threads_handler",
     "build_build_imitation_dataset_handler",
@@ -18,9 +17,7 @@ from bot_operations.application.features import (
     assign_neuroclone_to_bot,
     run_bot,
 )
-from bot_operations.application.interfaces import IBotRunnerService
 from bot_operations.infrastructure.db import SqlAlchemyUnitOfWork as BotOpsUoW
-from bot_operations.infrastructure.dummy_bot_runner import DummyBotRunnerService
 from common.infrastructure.db.utils import get_session_maker
 from constants import BASE_PATH
 from data_preparation.application.features import (
@@ -40,7 +37,6 @@ from model_engine.infrastructure.db import SqlAlchemyUnitOfWork as ModelEngineUo
 
 _storage: IStorage | None = None
 _inference_engine: IInferenceEngine | None = None
-_bot_runner: IBotRunnerService | None = None
 
 
 def build_storage() -> IStorage:
@@ -57,14 +53,6 @@ def build_inference_engine() -> IInferenceEngine:
     return _inference_engine
 
 
-def build_bot_runner() -> IBotRunnerService:
-    global _bot_runner
-    if _bot_runner is None:
-        _bot_runner = DummyBotRunnerService()
-    return _bot_runner
-
-
-
 def open_data_prep_uow() -> DataPrepUoW:
     return DataPrepUoW(session_factory=get_session_maker())
 
@@ -75,7 +63,6 @@ def open_model_engine_uow() -> ModelEngineUoW:
 
 def open_bot_ops_uow() -> BotOpsUoW:
     return BotOpsUoW(session_factory=get_session_maker())
-
 
 
 def build_ingest_chat_export_handler(
@@ -129,7 +116,4 @@ def build_assign_neuroclone_to_bot_handler(
 def build_run_bot_handler(
         uow: BotOpsUoW,
 ) -> run_bot.CommandHandler:
-    return run_bot.CommandHandler(
-        uow=uow,
-        bot_runner=build_bot_runner(),
-    )
+    return run_bot.CommandHandler(uow=uow)
