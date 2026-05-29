@@ -3,7 +3,13 @@ __all__ = ["TrainingDataset"]
 from datetime import datetime
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, OwnerTelegramID, FileReference
+from common.domain.value_objects import (
+    FileReference,
+    ID,
+    OwnerTelegramID,
+    ReplyPeriod,
+    UserName,
+)
 from data_preparation.domain.entities.chat_export import ChatExport
 
 
@@ -15,6 +21,7 @@ class TrainingDataset(Aggregate):
             file_reference: FileReference
             source_chat_export_id: int
             n_pairs: int
+            reply_period: int
 
         payload: Payload
 
@@ -27,6 +34,7 @@ class TrainingDataset(Aggregate):
             file_reference: FileReference,
             n_pairs: int,
             built_at: datetime,
+            reply_period: ReplyPeriod,
     ):
         super().__init__()
         self._id = id_
@@ -36,6 +44,7 @@ class TrainingDataset(Aggregate):
         self._file_reference = file_reference
         self._n_pairs = n_pairs
         self._built_at = built_at
+        self._reply_period = reply_period
 
     @property
     def id(self) -> ID:
@@ -65,6 +74,10 @@ class TrainingDataset(Aggregate):
     def built_at(self) -> datetime:
         return self._built_at
 
+    @property
+    def reply_period(self) -> ReplyPeriod:
+        return self._reply_period
+
     @classmethod
     def create(
             cls,
@@ -74,6 +87,7 @@ class TrainingDataset(Aggregate):
             file_reference: FileReference,
             n_pairs: int,
             built_at: datetime,
+            reply_period: ReplyPeriod,
     ) -> "TrainingDataset":
         dataset: "TrainingDataset" = cls(
             id_=ID.create(),
@@ -83,6 +97,7 @@ class TrainingDataset(Aggregate):
             file_reference=file_reference,
             n_pairs=n_pairs,
             built_at=built_at,
+            reply_period=reply_period,
         )
         dataset._events_to_publish.append(cls.EventDatasetBuilt(
             object_id=str(dataset.id.value),
@@ -92,6 +107,7 @@ class TrainingDataset(Aggregate):
                 file_reference=file_reference,
                 source_chat_export_id=source_chat_export_id.value,
                 n_pairs=n_pairs,
+                reply_period=reply_period.value,
             ),
         ))
         return dataset

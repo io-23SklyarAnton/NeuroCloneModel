@@ -6,7 +6,13 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID, UserName, OwnerTelegramID, FileReference
+from common.domain.value_objects import (
+    FileReference,
+    ID,
+    OwnerTelegramID,
+    ReplyPeriod,
+    UserName,
+)
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from model_engine.application.interfaces.repositories import INeuroCloneRepository
@@ -63,10 +69,7 @@ class NeuroCloneRepository(
                 adapter_file_reference.key
                 if adapter_file_reference is not None else None
             ),
-            reply_period=(
-                aggregate.reply_period.value
-                if aggregate.reply_period is not None else None
-            ),
+            reply_period=aggregate.reply_period.value,
         )
 
     def from_db_model_to_aggregate(
@@ -91,10 +94,7 @@ class NeuroCloneRepository(
                 and db_model.adapter_file_key is not None
                 else None
             ),
-            reply_period=(
-                NeuroCloneAggregate.ReplyPeriod(value=db_model.reply_period)
-                if db_model.reply_period is not None else None
-            ),
+            reply_period=ReplyPeriod(value=db_model.reply_period),
         )
 
     def _filter_by_id(

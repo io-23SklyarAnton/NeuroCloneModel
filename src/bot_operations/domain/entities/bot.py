@@ -5,7 +5,7 @@ from enum import StrEnum
 from typing import Optional
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, ValueObject, OwnerTelegramID
+from common.domain.value_objects import ID, OwnerTelegramID, ReplyPeriod, ValueObject
 
 
 class Bot(Aggregate):
@@ -70,6 +70,7 @@ class Bot(Aggregate):
             name: Name,
             status: BotStatus,
             neuroclone_id: Optional[ID],
+            reply_period: Optional[ReplyPeriod],
     ) -> None:
         super().__init__()
         self._id = id_
@@ -78,6 +79,7 @@ class Bot(Aggregate):
         self._name = name
         self._status = status
         self._neuroclone_id = neuroclone_id
+        self._reply_period = reply_period
 
     @property
     def id(self) -> ID:
@@ -104,6 +106,10 @@ class Bot(Aggregate):
         return self._neuroclone_id
 
     @property
+    def reply_period(self) -> Optional[ReplyPeriod]:
+        return self._reply_period
+
+    @property
     def is_running(self) -> bool:
         return self._status == self.BotStatus.RUNNING
 
@@ -121,6 +127,7 @@ class Bot(Aggregate):
             name=name,
             status=cls.BotStatus.PENDING,
             neuroclone_id=None,
+            reply_period=None,
         )
         bot._events_to_publish.append(cls.EventBotCreated(
             object_id=str(bot.id.value),
@@ -142,10 +149,12 @@ class Bot(Aggregate):
     def assign_neuroclone(
             self,
             neuroclone_id: ID,
+            reply_period: ReplyPeriod,
     ) -> None:
         if self._neuroclone_id is not None:
             raise RuntimeError(f"Bot {self._id} already has a neuroclone assigned.")
         self._neuroclone_id = neuroclone_id
+        self._reply_period = reply_period
 
         self._events_to_publish.append(Bot.NeuroCloneAssigned(
             object_id=str(self._id.value),

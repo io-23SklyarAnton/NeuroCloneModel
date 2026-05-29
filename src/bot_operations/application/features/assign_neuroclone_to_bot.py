@@ -9,12 +9,13 @@ from typing import Optional
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand, Response
-from common.domain.value_objects import OwnerTelegramID, ID
+from common.domain.value_objects import ID, OwnerTelegramID, ReplyPeriod
 
 
 class Command(ICommand):
     owner_id: OwnerTelegramID
     neuroclone_id: ID
+    reply_period: ReplyPeriod
 
 
 class CommandHandler:
@@ -34,7 +35,10 @@ class CommandHandler:
             print(f"ERROR: No bot without neuroclone found for owner_id={command.owner_id.value}")
             return None
 
-        bot.assign_neuroclone(command.neuroclone_id)
+        bot.assign_neuroclone(
+            neuroclone_id=command.neuroclone_id,
+            reply_period=command.reply_period,
+        )
         self._uow.bot.update(bot)
 
         await self._uow.commit()

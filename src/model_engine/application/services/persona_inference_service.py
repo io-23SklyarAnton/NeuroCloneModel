@@ -55,10 +55,10 @@ class PersonaInferenceService:
             neuroclone_id: uuid.UUID,
             context: list[ChatContextMessage],
     ) -> Optional[str]:
-        neuroclone: Optional[NeuroClone] = await self._uow.neuroclone.get_by_id_optional(
+        neuroclone: Optional[NeuroClone] = await self._uow.neuroclone.get_by_id_or_raise(
             ID(value=neuroclone_id),
         )
-        if neuroclone is None or not neuroclone.is_ready or neuroclone.adapter_file_reference is None:
+        if not neuroclone.is_ready or neuroclone.adapter_file_reference is None:
             return None
 
         user_prompt: str = self._build_user_prompt(context)

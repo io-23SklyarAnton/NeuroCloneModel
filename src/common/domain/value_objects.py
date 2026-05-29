@@ -4,10 +4,12 @@ __all__ = [
     "UserName",
     "OwnerTelegramID",
     "FileReference",
+    "ReplyPeriod",
 ]
 
 import abc
 import uuid
+from typing import Self
 
 import pydantic
 
@@ -79,3 +81,23 @@ class FileReference(ValueObject):
     @property
     def full_path(self) -> str:
         return f"{self.bucket}/{self.key}"
+
+
+class ReplyPeriod(ValueObject):
+    value: int
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ReplyPeriod):
+            return False
+
+        return self.value == other.value
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+    @pydantic.model_validator(mode="after")
+    def _validate_value(self) -> Self:
+        if self.value < 1:
+            raise ValueError("Reply period must be at least 1.")
+
+        return self

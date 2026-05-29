@@ -11,7 +11,7 @@ import jinja2
 import pydantic
 
 from common.application.base import ICommand, Response
-from common.domain.value_objects import UserName, FileReference
+from common.domain.value_objects import FileReference, ReplyPeriod, UserName
 from data_preparation.application import constants
 from data_preparation.application.interfaces import IStorage, IUnitOfWork
 from data_preparation.domain.entities import ChatExport, ParsedMessage, TrainingDataset
@@ -28,6 +28,10 @@ class CommandHandler:
     class ImitationPair(pydantic.BaseModel):
         context: str
         expected_response: str
+
+    class _BuildResult(pydantic.BaseModel):
+        pairs: list["CommandHandler.ImitationPair"]
+        n_target_messages: int
 
     def __init__(
             self,
@@ -50,12 +54,13 @@ class CommandHandler:
     ) -> Response:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
 
-        pairs: list[CommandHandler.ImitationPair] = await self._build_pairs(
+        build_result: CommandHandler._BuildResult = await self._build_pairs(
             chat_export_id=chat_export.id,
             target_user=chat_export.target_user_name,
         )
+        pairs: list[CommandHandler.ImitationPair] = build_result.pairs
 
-        system_prompt: str = self._build_system_prompt(command.target_user)
+        system_prompt: str = self._build_system_prompt(chat_export.target_user_name)
         file_reference: FileReference = self._make_file_reference(command.chat_export_id)
         content: BytesIO = self._serialize_dataset(
             dataset=pairs,
@@ -67,6 +72,11 @@ class CommandHandler:
             file_reference=file_reference,
         )
 
+        reply_period: ReplyPeriod = self._compute_reply_period(
+            n_total_messages=chat_export.n_messages,
+            n_target_messages=build_result.n_target_messages,
+        )
+
         dataset: TrainingDataset = TrainingDataset.create(
             owner_id=chat_export.owner_id,
             target_user=chat_export.target_user_name,
@@ -74,6 +84,7 @@ class CommandHandler:
             file_reference=file_reference,
             n_pairs=len(pairs),
             built_at=get_now_datetime(),
+            reply_period=reply_period,
         )
         self._uow.training_dataset.create(dataset)
         await self._uow.commit()
@@ -84,14 +95,21 @@ class CommandHandler:
             self,
             chat_export_id: ChatExport.ChatID,
             target_user: UserName,
-    ) -> list[ImitationPair]:
+    ) -> _BuildResult:
         threads = await self._uow.thread.get_all_by_chat_export_id(chat_export_id)
         pairs: list[CommandHandler.ImitationPair] = []
+        n_target_messages: int = 0
         for thread in threads:
             messages = await self._uow.parsed_message.get_by_thread_id(thread.id)
             pairs.extend(self._pairs_from_thread(messages, target_user))
+            n_target_messages += sum(
+                1 for m in messages if m.from_user.value == target_user.value
+            )
 
-        return pairs
+        return CommandHandler._BuildResult(
+            pairs=pairs,
+            n_target_messages=n_target_messages,
+        )
 
     def _pairs_from_thread(
             self,
@@ -183,3 +201,14 @@ class CommandHandler:
     @staticmethod
     def _build_system_prompt(target_user: UserName) -> str:
         return constants.IMITATION_SYSTEM_PROMPT.format(target_user=target_user.value)
+
+    @staticmethod
+    def _compute_reply_period(
+            n_total_messages: int,
+            n_target_messages: int,
+    ) -> ReplyPeriod:
+        if n_target_messages <= 0:
+            return ReplyPeriod(value=max(n_total_messages, 1))
+
+        ratio: int = max(1, n_total_messages // n_target_messages)
+        return ReplyPeriod(value=ratio)

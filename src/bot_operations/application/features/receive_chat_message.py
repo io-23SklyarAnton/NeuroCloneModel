@@ -16,7 +16,7 @@ from bot_operations.application.interfaces import (
 )
 from bot_operations.domain.entities import Bot, LiveChat, LiveMessage
 from common.application.base import ICommand
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID, ReplyPeriod, UserName
 from utils import get_now_datetime
 
 
@@ -64,7 +64,7 @@ class CommandHandler:
             return Response(reply_text=None)
 
         if not self._should_reply(
-                bot=bot,
+                reply_period=bot.reply_period,
                 live_chat=live_chat,
         ):
             await self._uow.commit()
@@ -115,15 +115,15 @@ class CommandHandler:
 
     @staticmethod
     def _should_reply(
-            bot: Bot,
+            reply_period: Optional[ReplyPeriod],
             live_chat: LiveChat,
     ) -> bool:
-        if bot.reply_period is None:
+        if reply_period is None:
             return False
 
         messages_since_last_reply: int = live_chat.count_messages_since_last_bot_reply()
         if messages_since_last_reply == 0:
             return False
 
-        geometric_trial_probability: float = 1.0 / bot.reply_period.value
+        geometric_trial_probability: float = 1.0 / reply_period.value
         return random.random() < geometric_trial_probability

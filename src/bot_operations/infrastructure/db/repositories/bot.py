@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from bot_operations.application.interfaces.repositories import IBotRepository
 from bot_operations.domain.entities import Bot as BotAggregate
 from bot_operations.infrastructure.db.models import Bot as DBBot
-from common.domain.value_objects import ID, OwnerTelegramID
+from common.domain.value_objects import ID, OwnerTelegramID, ReplyPeriod
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 
@@ -88,6 +88,10 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 if aggregate.neuroclone_id is not None else None
             ),
             status=aggregate.status,
+            reply_period=(
+                aggregate.reply_period.value
+                if aggregate.reply_period is not None else None
+            ),
         )
 
     def from_db_model_to_aggregate(
@@ -104,6 +108,10 @@ class BotRepository(IBotRepository, BaseRepository[BotAggregate, DBBot]):
                 if db_model.neuroclone_id is not None else None
             ),
             status=db_model.status,
+            reply_period=(
+                ReplyPeriod(value=db_model.reply_period)
+                if db_model.reply_period is not None else None
+            ),
         )
 
     def _filter_by_id(

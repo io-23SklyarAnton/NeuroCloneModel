@@ -2,12 +2,16 @@ __all__ = ["NeuroClone"]
 
 import uuid
 from enum import StrEnum
-from typing import Optional, Self
-
-from pydantic import model_validator
+from typing import Optional
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ID, UserName, ValueObject, OwnerTelegramID, FileReference
+from common.domain.value_objects import (
+    FileReference,
+    ID,
+    OwnerTelegramID,
+    ReplyPeriod,
+    UserName,
+)
 
 
 class NeuroClone(Aggregate):
@@ -16,24 +20,6 @@ class NeuroClone(Aggregate):
         TRAINING = "TRAINING"
         READY = "READY"
         FAILED = "FAILED"
-
-    class ReplyPeriod(ValueObject):
-        value: int
-
-        def __eq__(self, other: object) -> bool:
-            assert isinstance(other, NeuroClone.ReplyPeriod)
-
-            return self.value == other.value
-
-        def __hash__(self) -> int:
-            return hash(self.value)
-
-        @model_validator(mode='after')
-        def validate_value(self) -> Self:
-            if self.value < 1:
-                raise ValueError("Reply period must be at least 1.")
-
-            return self
 
     class IllegalStateTransitionError(RuntimeError):
         def __init__(
@@ -51,6 +37,7 @@ class NeuroClone(Aggregate):
     class EventNeuroCloneReady(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):
             owner_telegram_id: OwnerTelegramID
+            reply_period: int
 
         payload: Payload
 
@@ -62,10 +49,10 @@ class NeuroClone(Aggregate):
             id_: ID,
             owner_id: OwnerTelegramID,
             target_user_name: UserName,
-            dataset_file_reference: Optional[FileReference],
+            dataset_file_reference: FileReference,
             status: Status,
             adapter_file_reference: Optional[FileReference],
-            reply_period: Optional[ReplyPeriod],
+            reply_period: ReplyPeriod,
     ) -> None:
         super().__init__()
         self._id = id_
@@ -89,7 +76,7 @@ class NeuroClone(Aggregate):
         return self._target_user_name
 
     @property
-    def dataset_file_reference(self) -> Optional[FileReference]:
+    def dataset_file_reference(self) -> FileReference:
         return self._dataset_file_reference
 
     @property
@@ -101,7 +88,7 @@ class NeuroClone(Aggregate):
         return self._adapter_file_reference
 
     @property
-    def reply_period(self) -> Optional[ReplyPeriod]:
+    def reply_period(self) -> ReplyPeriod:
         return self._reply_period
 
     @property
@@ -114,6 +101,7 @@ class NeuroClone(Aggregate):
             owner_id: OwnerTelegramID,
             target_user_name: UserName,
             dataset_file_reference: FileReference,
+            reply_period: ReplyPeriod,
     ) -> "NeuroClone":
         neuroclone = NeuroClone(
             id_=ID(value=uuid.uuid4()),
@@ -122,7 +110,7 @@ class NeuroClone(Aggregate):
             dataset_file_reference=dataset_file_reference,
             status=cls.Status.PREPARING,
             adapter_file_reference=None,
-            reply_period=None,
+            reply_period=reply_period,
         )
 
         neuroclone._events_to_publish.append(NeuroClone.EventNeuroCloneCreated(
@@ -168,6 +156,7 @@ class NeuroClone(Aggregate):
             object_id=str(self._id.value),
             payload=NeuroClone.EventNeuroCloneReady.Payload(
                 owner_telegram_id=self._owner_id,
+                reply_period=self._reply_period.value,
             ),
         ))
 
