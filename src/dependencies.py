@@ -18,14 +18,14 @@ from bot_operations.infrastructure.aiogram_bot_runner import AiogramBotRunnerSer
 from bot_operations.infrastructure.db import (
     SqlAlchemyUnitOfWork as BotOpsSqlAlchemyUoW,
 )
+from bot_operations.infrastructure.remote_persona_reply_service import (
+    RemotePersonaReplyService,
+)
 from common.application.interfaces import IEventBus, IStorage
 from common.infrastructure.db.utils import get_session_maker
 from constants import BASE_PATH
 from data_preparation.application.features import (
-    BuildImitationDatasetCommandHandler,
     CreateChatExportCommandHandler,
-    IngestChatExportCommandHandler,
-    ProcessChatThreadsCommandHandler,
 )
 from data_preparation.application.interfaces import IUnitOfWork as DataPrepUoW
 from data_preparation.infrastructure.db import (
@@ -36,20 +36,15 @@ from iam.application.features import RegisterUserCommandHandler
 from iam.application.interfaces import IUnitOfWork as IamUoW
 from iam.infrastructure.db import SqlAlchemyUnitOfWork as IamSqlAlchemyUoW
 from infrastructure.celery.event_bus import CeleryEventBus
-from infrastructure.llm import IInferenceEngine, MLXInferenceEngine
-from model_engine.application.features import (
-    CreateNeuroCloneCommandHandler,
-    TrainLoraAdapterCommandHandler,
-)
 from model_engine.application.interfaces import (
     IUnitOfWork as ModelEngineUoW,
-)
-from model_engine.application.services import (
-    PersonaInferenceService,
 )
 from model_engine.infrastructure.db import (
     SqlAlchemyUnitOfWork as ModelEngineSqlAlchemyUoW,
 )
+
+
+_PERSONA_REPLY_TIMEOUT_SECONDS: float = 60.0
 
 
 class AppProvider(Provider):
@@ -79,8 +74,10 @@ class AppProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def get_inference_engine(self) -> IInferenceEngine:
-        return MLXInferenceEngine()
+    def get_persona_reply_service(self) -> PersonaReplyService:
+        return RemotePersonaReplyService(
+            timeout_seconds=_PERSONA_REPLY_TIMEOUT_SECONDS,
+        )
 
     @provide(scope=Scope.REQUEST)
     def get_iam_uow(self, session_maker: sessionmaker) -> Iterable[IamUoW]:
@@ -101,19 +98,6 @@ class AppProvider(Provider):
     def get_model_engine_uow(self, session_maker: sessionmaker) -> Iterable[ModelEngineUoW]:
         with ModelEngineSqlAlchemyUoW(session_factory=session_maker) as uow:
             yield uow
-
-    @provide(scope=Scope.REQUEST)
-    def get_persona_reply_service(
-            self,
-            uow: ModelEngineUoW,
-            inference_engine: IInferenceEngine,
-            storage: IStorage,
-    ) -> PersonaReplyService:
-        return PersonaInferenceService(
-            uow=uow,
-            inference_engine=inference_engine,
-            storage=storage,
-        )
 
     @provide(scope=Scope.REQUEST)
     def get_register_user_handler(
@@ -161,50 +145,3 @@ class AppProvider(Provider):
             storage: IStorage,
     ) -> CreateChatExportCommandHandler:
         return CreateChatExportCommandHandler(uow=uow, storage=storage)
-
-    @provide(scope=Scope.REQUEST)
-    def get_ingest_chat_export_handler(
-            self,
-            uow: DataPrepUoW,
-            storage: IStorage,
-    ) -> IngestChatExportCommandHandler:
-        return IngestChatExportCommandHandler(uow=uow, storage=storage)
-
-    @provide(scope=Scope.REQUEST)
-    def get_process_chat_threads_handler(
-            self,
-            uow: DataPrepUoW,
-            inference_engine: IInferenceEngine,
-    ) -> ProcessChatThreadsCommandHandler:
-        return ProcessChatThreadsCommandHandler(
-            uow=uow,
-            inference_engine=inference_engine,
-        )
-
-    @provide(scope=Scope.REQUEST)
-    def get_build_imitation_dataset_handler(
-            self,
-            uow: DataPrepUoW,
-            storage: IStorage,
-    ) -> BuildImitationDatasetCommandHandler:
-        return BuildImitationDatasetCommandHandler(uow=uow, storage=storage)
-
-    @provide(scope=Scope.REQUEST)
-    def get_create_neuroclone_handler(
-            self,
-            uow: ModelEngineUoW,
-    ) -> CreateNeuroCloneCommandHandler:
-        return CreateNeuroCloneCommandHandler(uow=uow)
-
-    @provide(scope=Scope.REQUEST)
-    def get_train_lora_adapter_handler(
-            self,
-            uow: ModelEngineUoW,
-            inference_engine: IInferenceEngine,
-            storage: IStorage,
-    ) -> TrainLoraAdapterCommandHandler:
-        return TrainLoraAdapterCommandHandler(
-            uow=uow,
-            inference_engine=inference_engine,
-            storage=storage,
-        )

@@ -35,8 +35,14 @@ allow-direct-references = true
 packages = ["src/neuroclonemodel"]
 
 [tool.rye.scripts]
-bot = { cmd = "python src/app.py", env-file = ".env" }
-worker = { cmd = "celery -A infrastructure.celery.celery_app worker --loglevel=info", env-file = ".env" }
-beat = { cmd = "celery -A infrastructure.celery.celery_app beat --loglevel=info", env-file = ".env" }
+infra-up = "docker compose up -d"
+infra-down = "docker compose down"
 
-start-all = "sh -c 'rye run bot & rye run worker & rye run beat & wait'"
+bot = { cmd = "python src/app.py", env-file = ".env" }
+
+worker-cpu = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src worker --pool=prefork --concurrency=4 --queues=celery --loglevel=info", env-file = ".env" }
+worker-ml = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src worker --pool=solo --queues=ml --loglevel=info", env-file = ".env" }
+
+beat = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src beat --loglevel=info", env-file = ".env" }
+
+start-all = "sh -c 'rye run bot & rye run worker-cpu & rye run worker-ml & rye run beat & wait'"

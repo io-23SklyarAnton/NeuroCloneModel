@@ -29,7 +29,7 @@ class TrainingDataset(Base):
         nullable=False,
     )
     source_chat_export_id: Mapped[int] = mapped_column(
-        Integer,
+        BigInteger,
         nullable=False,
     )
     file_bucket: Mapped[str] = mapped_column(

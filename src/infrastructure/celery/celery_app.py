@@ -18,7 +18,11 @@ def _configure_logging(**_: object) -> None:
     )
 
 
-celery_app: Celery = Celery("worker", broker=config.RABBITMQ_LINK)
+celery_app: Celery = Celery(
+    "worker",
+    broker=config.RABBITMQ_LINK,
+    backend="rpc://",
+)
 celery_app.autodiscover_tasks(packages=[
     "infrastructure.celery.periodic_tasks",
     "infrastructure.celery.scheduled_tasks",
@@ -27,10 +31,17 @@ celery_app.autodiscover_tasks(packages=[
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
+    result_serializer="json",
     timezone="UTC",
     enable_utc=True,
     beat_scheduler="celery.beat.PersistentScheduler",
 )
+
+celery_app.conf.task_routes = {
+    "process_chat_threads_task": {"queue": "ml"},
+    "train_lora_adapter_task": {"queue": "ml"},
+    "generate_persona_reply_task": {"queue": "ml"},
+}
 
 celery_app.conf.beat_schedule = {
     "dispatch_events": {

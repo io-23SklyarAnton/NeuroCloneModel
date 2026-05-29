@@ -1,6 +1,7 @@
 __all__ = [
     "build_storage",
     "build_inference_engine",
+    "build_persona_inference_service",
     "build_ingest_chat_export_handler",
     "build_process_chat_threads_handler",
     "build_build_imitation_dataset_handler",
@@ -33,6 +34,7 @@ from model_engine.application.features import (
     create_neuroclone,
     train_lora_adapter,
 )
+from model_engine.application.services import PersonaInferenceService
 from model_engine.infrastructure.db import SqlAlchemyUnitOfWork as ModelEngineUoW
 
 _storage: IStorage | None = None
@@ -90,6 +92,16 @@ def build_build_imitation_dataset_handler(
 ) -> build_imitation_dataset.CommandHandler:
     return build_imitation_dataset.CommandHandler(
         uow=uow,
+        storage=build_storage(),
+    )
+
+
+def build_persona_inference_service(
+        uow: ModelEngineUoW,
+) -> PersonaInferenceService:
+    return PersonaInferenceService(
+        uow=uow,
+        inference_engine=build_inference_engine(),
         storage=build_storage(),
     )
 

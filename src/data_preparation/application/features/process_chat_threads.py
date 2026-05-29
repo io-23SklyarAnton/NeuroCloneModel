@@ -191,7 +191,7 @@ class CommandHandler:
             message: ParsedMessage,
             messages_sub: list[ParsedMessage],
     ) -> Thread:
-        fast_track_thread: Optional[Thread] = self._try_fast_track_quick_reply(message)
+        fast_track_thread: Optional[Thread] = await self._try_fast_track_quick_reply(message)
         if fast_track_thread is not None:
             return fast_track_thread
 
@@ -207,17 +207,17 @@ class CommandHandler:
             thread_mapping=thread_mapping,
         )
 
-        return self._apply_thread_decision(
+        return await self._apply_thread_decision(
             decision=decision,
             message=message,
         )
 
-    def _try_fast_track_quick_reply(
+    async def _try_fast_track_quick_reply(
             self,
             message: ParsedMessage,
     ) -> Optional[Thread]:
         if not self._active_threads:
-            new_thread: Thread = self._create_thread_and_add_to_active(message)
+            new_thread: Thread = await self._create_thread_and_add_to_active(message)
             return new_thread
 
         words = re.findall(r'\w+', message.text.value)
@@ -275,13 +275,13 @@ class CommandHandler:
             is_new_thread=True,
         )
 
-    def _apply_thread_decision(
+    async def _apply_thread_decision(
             self,
             decision: "CommandHandler.ThreadDecision",
             message: ParsedMessage,
     ) -> Thread:
         if decision.is_new_thread:
-            new_thread: Thread = self._create_thread_and_add_to_active(message)
+            new_thread: Thread = await self._create_thread_and_add_to_active(message)
             return new_thread
 
         return self._get_thread_from_active_threads_by_id(
@@ -484,12 +484,13 @@ class CommandHandler:
 
         return future_messages_data
 
-    def _create_thread_and_add_to_active(
+    async def _create_thread_and_add_to_active(
             self,
             message: ParsedMessage,
     ) -> Thread:
         new_thread = Thread.create(message=message)
         self._uow.thread.create(new_thread)
+        await self._uow.flush()
         self._add_thread_to_active(new_thread)
 
         return new_thread
