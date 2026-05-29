@@ -20,7 +20,7 @@ from bot_operations.application.features import (
 from bot_operations.infrastructure.db import SqlAlchemyUnitOfWork as BotOpsUoW
 from common.application.interfaces import IStorage
 from common.infrastructure.db.utils import get_session_maker
-from constants import BASE_PATH
+from constants import BASE_PATH, AvailableModel
 from data_preparation.application.features import (
     build_imitation_dataset,
     ingest_chat_export,
@@ -49,7 +49,9 @@ def build_storage() -> IStorage:
 def build_inference_engine() -> IInferenceEngine:
     global _inference_engine
     if _inference_engine is None:
-        _inference_engine = MLXInferenceEngine()
+        _inference_engine = MLXInferenceEngine(
+            base_model=AvailableModel.LLAMA_3_2_3B  # TODO: make more flexible
+        )
     return _inference_engine
 
 

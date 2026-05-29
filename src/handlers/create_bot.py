@@ -93,7 +93,7 @@ async def handle_bot_token(
 async def handle_chat_export_file(
         message: Message,
         state: FSMContext,
-        aiogram_bot: AiogramBot,
+        bot: AiogramBot,
 ) -> None:
     message_document = message.document
     if message.from_user is None:
@@ -104,7 +104,7 @@ async def handle_chat_export_file(
         return
 
     file_buffer: BytesIO = BytesIO()
-    await aiogram_bot.download(file=message_document.file_id, destination=file_buffer)
+    await bot.download(file=message_document.file_id, destination=file_buffer)
     file_buffer.seek(0)
 
     raw_bytes: bytes = file_buffer.getvalue()
@@ -142,7 +142,7 @@ async def handle_chat_export_file(
 async def handle_target_user_selection(
         callback: CallbackQuery,
         state: FSMContext,
-        aiogram_bot: AiogramBot,
+        bot: AiogramBot,
         create_bot_handler: FromDishka[CreateBotCommandHandler],
         create_chat_export_handler: FromDishka[CreateChatExportCommandHandler],
 ) -> None:
@@ -168,7 +168,7 @@ async def handle_target_user_selection(
 
     file_id = state_data[_FSM_KEY_CHAT_EXPORT_ID]
     file_buffer = BytesIO()
-    await aiogram_bot.download(file=file_id, destination=file_buffer)
+    await bot.download(file=file_id, destination=file_buffer)
     file_buffer.seek(0)
 
     create_export_response = await create_chat_export_handler.handle(CreateChatExportCommand(

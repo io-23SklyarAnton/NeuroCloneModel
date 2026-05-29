@@ -15,3 +15,6 @@ src/eval/adapters
 src/eval/manual_tests
 .claude
 */.env
+.env
+storage
+celerybeat-schedule.db

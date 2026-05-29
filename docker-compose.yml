@@ -10,12 +10,12 @@ services:
       POSTGRES_PASSWORD: "12345"
       POSTGRES_DB: neuroclone_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   rabbitmq:
-    image: rabbitmq:3.13-management
+    image: rabbitmq:3.13.7-management-alpine
     container_name: neuroclone_rabbitmq
     restart: always
     environment:

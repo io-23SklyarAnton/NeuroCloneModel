@@ -6,12 +6,11 @@ import datetime
 import uuid
 from typing import Optional
 
-from sqlalchemy import DateTime, UUID
+from sqlalchemy import DateTime, UUID, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from common.infrastructure.db.models.base import Base
-from common.infrastructure.db.utils import get_utc_now_naive
 
 
 class OutboxMessage(Base):
@@ -24,7 +23,7 @@ class OutboxMessage(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=False),
         nullable=False,
-        default=get_utc_now_naive,
+        server_default=text("timezone('UTC', now())"),
     )
     scheduled_at: Mapped[Optional[datetime.datetime]] = mapped_column(
         DateTime(timezone=False),

@@ -33,3 +33,10 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/neuroclonemodel"]
+
+[tool.rye.scripts]
+bot = { cmd = "python src/app.py", env-file = ".env" }
+worker = { cmd = "celery -A infrastructure.celery.celery_app worker --loglevel=info", env-file = ".env" }
+beat = { cmd = "celery -A infrastructure.celery.celery_app beat --loglevel=info", env-file = ".env" }
+
+start-all = "sh -c 'rye run bot & rye run worker & rye run beat & wait'"
