@@ -85,7 +85,7 @@ class CommandHandler:
             file_reference=file_reference,
             n_pairs=len(pairs),
             built_at=get_now_datetime(),
-            reply_period=reply_period,
+            reply_period=reply_period,  # TODO: remove it from dataset creation
         )
         self._uow.training_dataset.create(dataset)
         await self._uow.commit()

@@ -3,7 +3,7 @@ __all__ = ["ChatExport"]
 from enum import StrEnum
 
 from common.domain.entities import Aggregate
-from common.domain.value_objects import ValueObject, UserName, OwnerTelegramID, FileReference
+from common.domain.value_objects import FileReference, OwnerTelegramID, UserName, ValueObject
 
 
 class ChatExport(Aggregate):
@@ -35,6 +35,8 @@ class ChatExport(Aggregate):
     class EventChatExportCreated(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):
             file_reference: FileReference
+
+        payload: Payload
 
     class EventChatExportIngested(Aggregate.IDomainEvent):
         class Payload(Aggregate.IDomainEvent.Payload):

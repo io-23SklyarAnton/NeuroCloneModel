@@ -30,9 +30,7 @@ class CommandHandler:
             command: Command,
     ) -> None:
         bot: Optional[Bot] = await self._uow.bot.get_by_owner_id_without_neuroclone(command.owner_id)
-
         if bot is None:
-            print(f"ERROR: No bot without neuroclone found for owner_id={command.owner_id.value}")
             return None
 
         bot.assign_neuroclone(

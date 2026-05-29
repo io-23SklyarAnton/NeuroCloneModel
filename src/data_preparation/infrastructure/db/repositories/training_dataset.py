@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Query
 
-from common.domain.value_objects import ID, UserName, OwnerTelegramID, FileReference
+from common.domain.value_objects import FileReference, ID, OwnerTelegramID, UserName
 from common.exceptions.base import UnexpectedError
 from common.infrastructure.db.base_sql_alchemy_repository import BaseRepository
 from data_preparation.application.interfaces.repositories import ITrainingDatasetRepository

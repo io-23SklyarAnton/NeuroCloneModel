@@ -1,7 +1,6 @@
 __all__ = [
     "Command",
     "CommandHandler",
-    "Response",
 ]
 
 from typing import Optional
@@ -10,7 +9,7 @@ from bot_operations.application import constants
 from bot_operations.application.interfaces import IUnitOfWork
 from bot_operations.domain.entities import Bot
 from common.application.base import ICommand, Response
-from common.domain.value_objects import UserName, OwnerTelegramID
+from common.domain.value_objects import OwnerTelegramID
 
 
 class Command(ICommand):
@@ -49,7 +48,5 @@ class CommandHandler:
         await self._uow.commit()
 
         return Response(
-            message=(
-                f"Bot «{bot.name.value}» registered as {bot.status.value}. "
-            ),
+            message=f"Bot «{bot.name.value}» registered as {bot.status.value}.",
         )
