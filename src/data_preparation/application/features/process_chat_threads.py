@@ -77,6 +77,13 @@ class CommandHandler:
     async def handle(self, command: Command) -> None:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
 
+        if chat_export.status != ChatExport.Status.INGESTED:
+            print(
+                f"ChatExport {chat_export.chat_id.value} is in {chat_export.status.value} state, "
+                f"skipping thread processing."
+            )
+            return
+
         for offset in range(0, chat_export.n_messages, _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
             await self._process_batch(
                 chat_export_id=command.chat_export_id,

@@ -6,7 +6,7 @@ from common.domain.entities import Aggregate
 from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from data_preparation.application.interfaces.repositories import ITrainingDatasetRepository
-from data_preparation.domain.entities import TrainingDataset
+from data_preparation.domain.entities import ChatExport, TrainingDataset
 
 
 class InMemoryTrainingDatasetRepository(InMemoryBaseRepository[TrainingDataset], ITrainingDatasetRepository):
@@ -37,3 +37,13 @@ class InMemoryTrainingDatasetRepository(InMemoryBaseRepository[TrainingDataset],
             dataset for dataset in self._storage.values()
             if dataset.owner_id == owner_id
         ]
+
+    async def get_by_source_chat_export_id_optional(
+            self,
+            source_chat_export_id: ChatExport.ChatID,
+    ) -> Optional[TrainingDataset]:
+        for dataset in self._storage.values():
+            if dataset.source_chat_export_id == source_chat_export_id:
+                return dataset
+
+        return None

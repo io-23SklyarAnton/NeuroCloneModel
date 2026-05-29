@@ -5,7 +5,7 @@ from typing import Optional
 
 from common.domain.value_objects import ID, OwnerTelegramID
 from common.infrastructure.db.i_base_repository import IBaseRepository
-from data_preparation.domain.entities import TrainingDataset
+from data_preparation.domain.entities import ChatExport, TrainingDataset
 
 
 class ITrainingDatasetRepository(IBaseRepository[TrainingDataset]):
@@ -26,3 +26,9 @@ class ITrainingDatasetRepository(IBaseRepository[TrainingDataset]):
             self,
             owner_id: OwnerTelegramID,
     ) -> list[TrainingDataset]: ...
+
+    @abc.abstractmethod
+    async def get_by_source_chat_export_id_optional(
+            self,
+            source_chat_export_id: ChatExport.ChatID,
+    ) -> Optional[TrainingDataset]: ...

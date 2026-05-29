@@ -6,6 +6,7 @@ __all__ = [
 
 import json
 from io import BytesIO
+from typing import Optional
 
 import jinja2
 import pydantic
@@ -54,6 +55,17 @@ class CommandHandler:
             command: Command,
     ) -> Response:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
+
+        existing_dataset: Optional[TrainingDataset] = (
+            await self._uow.training_dataset.get_by_source_chat_export_id_optional(command.chat_export_id)
+        )
+        if existing_dataset is not None:
+            return Response(
+                message=(
+                    f"TrainingDataset already exists for chat_export {command.chat_export_id.value}, "
+                    f"skipping build."
+                ),
+            )
 
         build_result: CommandHandler._BuildResult = await self._build_pairs(
             chat_export_id=chat_export.id,

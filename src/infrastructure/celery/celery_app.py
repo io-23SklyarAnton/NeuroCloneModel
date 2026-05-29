@@ -35,6 +35,8 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     beat_scheduler="celery.beat.PersistentScheduler",
+    broker_heartbeat=0,
+    broker_connection_retry_on_startup=True,
 )
 
 celery_app.conf.task_routes = {

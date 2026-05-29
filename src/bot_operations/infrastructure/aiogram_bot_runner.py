@@ -11,7 +11,10 @@ from dishka.integrations.aiogram import setup_dishka
 from bot_operations.application.interfaces import IBotRunnerService
 from bot_operations.domain.entities import Bot
 from common.domain.value_objects import ID
-from handlers import live_message_router
+from handlers import create_live_message_router
+
+
+_STOP_POLLING_TIMEOUT_SECONDS: float = 5.0
 
 
 @dataclass
@@ -46,8 +49,13 @@ class AiogramBotRunnerService(IBotRunnerService):
 
         aiogram_bot: AiogramBot = AiogramBot(token=token.value)
         dispatcher: Dispatcher = Dispatcher()
-        dispatcher.include_router(live_message_router)
-        setup_dishka(container=self._container, router=dispatcher)
+
+        try:
+            dispatcher.include_router(create_live_message_router())
+            setup_dishka(container=self._container, router=dispatcher)
+        except Exception:
+            await aiogram_bot.session.close()
+            raise
 
         polling_task: asyncio.Task = asyncio.create_task(
             dispatcher.start_polling(
@@ -74,12 +82,26 @@ class AiogramBotRunnerService(IBotRunnerService):
         if running is None:
             return
 
-        await running.dispatcher.stop_polling()
+        try:
+            await asyncio.wait_for(
+                running.dispatcher.stop_polling(),
+                timeout=_STOP_POLLING_TIMEOUT_SECONDS,
+            )
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+        if not running.polling_task.done():
+            running.polling_task.cancel()
+
         try:
             await running.polling_task
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, Exception):
             pass
-        await running.aiogram_bot.session.close()
+
+        try:
+            await running.aiogram_bot.session.close()
+        except Exception:
+            pass
 
     async def is_running(
             self,

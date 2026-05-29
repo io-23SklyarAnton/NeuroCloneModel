@@ -54,6 +54,16 @@ class TrainingDatasetRepository(
         db_datasets: list[DBTrainingDataset] = query.all()
         return self.get_all(db_datasets)
 
+    async def get_by_source_chat_export_id_optional(
+            self,
+            source_chat_export_id: ChatExport.ChatID,
+    ) -> Optional[TrainingDatasetAggregate]:
+        query: Query = self.base_query()
+        query = query.filter(self.model.source_chat_export_id == source_chat_export_id.value)
+
+        db_dataset: Optional[DBTrainingDataset] = query.first()
+        return self.get_optional(db_dataset)
+
     def from_aggregate_to_db_model(
             self,
             aggregate: TrainingDatasetAggregate,

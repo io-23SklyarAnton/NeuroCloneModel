@@ -45,4 +45,7 @@ worker-ml = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src wo
 
 beat = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src beat --loglevel=info", env-file = ".env" }
 
-start-all = "sh -c 'rye run bot & rye run worker-cpu & rye run worker-ml & rye run beat & wait'"
+start-all = "sh -c 'trap \"kill 0\" EXIT INT TERM; rye run bot & rye run worker-cpu & rye run worker-ml & rye run beat & wait'"
+
+trigger = { cmd = "python src/scripts/trigger.py", env-file = ".env" }
+reset = { cmd = "python src/scripts/reset.py", env-file = ".env" }

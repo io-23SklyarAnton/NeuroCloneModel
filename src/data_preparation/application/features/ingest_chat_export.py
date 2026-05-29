@@ -45,6 +45,14 @@ class CommandHandler:
             command: Command,
     ) -> None:
         chat_export: ChatExport = await self._uow.chat_export.get_by_id_or_raise(command.chat_export_id)
+
+        if chat_export.status != ChatExport.Status.PENDING:
+            print(
+                f"ChatExport {chat_export.chat_id.value} is in {chat_export.status.value} state, "
+                f"skipping ingest."
+            )
+            return
+
         raw_bytes = await self._storage.load(
             file_reference=chat_export.file_reference,
         )
