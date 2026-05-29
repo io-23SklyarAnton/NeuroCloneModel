@@ -25,5 +25,12 @@ services:
       - "5672:5672"
       - "15672:15672"
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: neuroclone_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
 volumes:
   postgres_data:

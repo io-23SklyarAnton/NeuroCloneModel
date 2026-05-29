@@ -21,7 +21,7 @@ def _configure_logging(**_: object) -> None:
 celery_app: Celery = Celery(
     "worker",
     broker=config.RABBITMQ_LINK,
-    backend="rpc://",
+    backend=config.REDIS_LINK,
 )
 celery_app.autodiscover_tasks(packages=[
     "infrastructure.celery.periodic_tasks",

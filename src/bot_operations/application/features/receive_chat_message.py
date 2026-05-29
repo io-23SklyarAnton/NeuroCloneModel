@@ -46,7 +46,11 @@ class CommandHandler:
     ) -> Response:
         bot: Bot = await self._uow.bot.get_by_id_or_raise(command.bot_id)
 
-        live_chat: LiveChat = await self._get_or_create_chat(
+        existing_chat: Optional[LiveChat] = await self._uow.live_chat.get_by_id_optional(
+            command.chat_external_id,
+        )
+        is_new_chat: bool = existing_chat is None
+        live_chat: LiveChat = existing_chat if existing_chat is not None else LiveChat.create(
             external_id=command.chat_external_id,
             bot_id=command.bot_id,
         )
@@ -57,20 +61,43 @@ class CommandHandler:
             sent_at=get_now_datetime(),
         )
         live_chat.append_message(incoming_message)
-        self._uow.live_chat.update(live_chat)
 
+        reply_text: Optional[str] = await self._maybe_generate_reply(
+            bot=bot,
+            live_chat=live_chat,
+        )
+        if reply_text is not None:
+            bot_message: LiveMessage = LiveMessage.create_bot_message(
+                from_user=UserName(value=bot.name.value),
+                text=LiveMessage.Text(value=reply_text),
+                sent_at=get_now_datetime(),
+            )
+            live_chat.append_message(bot_message)
+
+        if is_new_chat:
+            self._uow.live_chat.create(live_chat)
+        else:
+            self._uow.live_chat.update(live_chat)
+
+        await self._uow.commit()
+
+        return Response(reply_text=reply_text)
+
+    async def _maybe_generate_reply(
+            self,
+            bot: Bot,
+            live_chat: LiveChat,
+    ) -> Optional[str]:
         if bot.neuroclone_id is None:
-            await self._uow.commit()
-            return Response(reply_text=None)
+            return None
 
         if not self._should_reply(
                 reply_period=bot.reply_period,
                 live_chat=live_chat,
         ):
-            await self._uow.commit()
-            return Response(reply_text=None)
+            return None
 
-        generated_text: Optional[str] = await self._persona_reply_service.generate_reply(
+        return await self._persona_reply_service.generate_reply(
             neuroclone_id=bot.neuroclone_id.value,
             context=[
                 ChatContextMessage(
@@ -80,38 +107,6 @@ class CommandHandler:
                 for message in live_chat.recent_messages
             ],
         )
-        if generated_text is None:
-            await self._uow.commit()
-            return Response(reply_text=None)
-
-        bot_message: LiveMessage = LiveMessage.create_bot_message(
-            from_user=UserName(value=bot.name.value),
-            text=LiveMessage.Text(value=generated_text),
-            sent_at=get_now_datetime(),
-        )
-        live_chat.append_message(bot_message)
-        self._uow.live_chat.update(live_chat)
-
-        await self._uow.commit()
-
-        return Response(reply_text=generated_text)
-
-    async def _get_or_create_chat(
-            self,
-            external_id: LiveChat.ExternalID,
-            bot_id: ID,
-    ) -> LiveChat:
-        existing: Optional[LiveChat] = await self._uow.live_chat.get_by_id_optional(external_id)
-        if existing is not None:
-            return existing
-
-        new_chat: LiveChat = LiveChat.create(
-            external_id=external_id,
-            bot_id=bot_id,
-        )
-        self._uow.live_chat.create(new_chat)
-
-        return new_chat
 
     @staticmethod
     def _should_reply(

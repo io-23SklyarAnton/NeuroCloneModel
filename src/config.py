@@ -22,3 +22,9 @@ RABBITMQ_LINK: str = (
     f"{RABBITMQ_PROTOCOL}://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}"
     f"@{RABBITMQ_HOST}:{RABBITMQ_PORT}"
 )
+
+REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost" if ENV == "dev" else "")
+REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+
+REDIS_LINK: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"

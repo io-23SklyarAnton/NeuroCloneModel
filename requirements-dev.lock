@@ -129,6 +129,8 @@ pyyaml==6.0.3
     # via huggingface-hub
     # via mlx-lm
     # via transformers
+redis==8.0.0
+    # via neuroclonemodel
 regex==2026.4.4
     # via transformers
 rich==15.0.0
