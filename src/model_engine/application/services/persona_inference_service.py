@@ -10,6 +10,7 @@ from typing import Optional
 import jinja2
 import pydantic
 
+from common.application.interfaces import IStorage
 from common.domain.value_objects import ID
 from infrastructure.llm import IInferenceEngine
 from model_engine.application import constants
@@ -27,6 +28,7 @@ class PersonaInferenceService:
             self,
             uow: IUnitOfWork,
             inference_engine: IInferenceEngine,
+            storage: IStorage,
             prompts_dir: Path = constants.PROMPTS_DIR,
             template_name: str = constants.IMITATION_CONTEXT_TEMPLATE_NAME,
             system_prompt_template: str = constants.IMITATION_SYSTEM_PROMPT,
@@ -37,6 +39,7 @@ class PersonaInferenceService:
     ) -> None:
         self._uow = uow
         self._inference_engine = inference_engine
+        self._storage = storage
         self._system_prompt_template = system_prompt_template
         self._max_tokens = max_tokens
         self._temperature = temperature
@@ -65,11 +68,12 @@ class PersonaInferenceService:
         system_prompt: str = self._system_prompt_template.format(
             target_user=neuroclone.target_user_name.value,
         )
+        adapter_path: Path = self._storage.resolve_local_path(neuroclone.adapter_file_reference)
 
         return await self._inference_engine.generate_async(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            lora_path=neuroclone.adapter_file_reference.full_path,
+            lora_path=str(adapter_path),
             max_tokens=self._max_tokens,
             temp=self._temperature,
             priority=self._priority,

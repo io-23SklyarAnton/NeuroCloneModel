@@ -18,7 +18,7 @@ from bot_operations.infrastructure.aiogram_bot_runner import AiogramBotRunnerSer
 from bot_operations.infrastructure.db import (
     SqlAlchemyUnitOfWork as BotOpsSqlAlchemyUoW,
 )
-from common.application.interfaces import IEventBus
+from common.application.interfaces import IEventBus, IStorage
 from common.infrastructure.db.utils import get_session_maker
 from constants import BASE_PATH
 from data_preparation.application.features import (
@@ -27,10 +27,7 @@ from data_preparation.application.features import (
     IngestChatExportCommandHandler,
     ProcessChatThreadsCommandHandler,
 )
-from data_preparation.application.interfaces import (
-    IStorage,
-    IUnitOfWork as DataPrepUoW,
-)
+from data_preparation.application.interfaces import IUnitOfWork as DataPrepUoW
 from data_preparation.infrastructure.db import (
     SqlAlchemyUnitOfWork as DataPrepSqlAlchemyUoW,
 )
@@ -39,7 +36,7 @@ from iam.application.features import RegisterUserCommandHandler
 from iam.application.interfaces import IUnitOfWork as IamUoW
 from iam.infrastructure.db import SqlAlchemyUnitOfWork as IamSqlAlchemyUoW
 from infrastructure.celery.event_bus import CeleryEventBus
-from infrastructure.llm import IInferenceEngine
+from infrastructure.llm import IInferenceEngine, MLXInferenceEngine
 from model_engine.application.features import (
     CreateNeuroCloneCommandHandler,
     TrainLoraAdapterCommandHandler,
@@ -81,6 +78,10 @@ class AppProvider(Provider):
             base_path=BASE_PATH.parent / "storage",
         )
 
+    @provide(scope=Scope.APP)
+    def get_inference_engine(self) -> IInferenceEngine:
+        return MLXInferenceEngine()
+
     @provide(scope=Scope.REQUEST)
     def get_iam_uow(self, session_maker: sessionmaker) -> Iterable[IamUoW]:
         with IamSqlAlchemyUoW(session_factory=session_maker) as uow:
@@ -106,10 +107,12 @@ class AppProvider(Provider):
             self,
             uow: ModelEngineUoW,
             inference_engine: IInferenceEngine,
+            storage: IStorage,
     ) -> PersonaReplyService:
         return PersonaInferenceService(
             uow=uow,
             inference_engine=inference_engine,
+            storage=storage,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -198,8 +201,10 @@ class AppProvider(Provider):
             self,
             uow: ModelEngineUoW,
             inference_engine: IInferenceEngine,
+            storage: IStorage,
     ) -> TrainLoraAdapterCommandHandler:
         return TrainLoraAdapterCommandHandler(
             uow=uow,
             inference_engine=inference_engine,
+            storage=storage,
         )

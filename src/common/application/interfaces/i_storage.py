@@ -2,6 +2,7 @@ __all__ = ["IStorage"]
 
 import abc
 from io import BytesIO
+from pathlib import Path
 
 from common.domain.value_objects import FileReference
 
@@ -25,3 +26,9 @@ class IStorage(abc.ABC):
             self,
             file_reference: FileReference,
     ) -> bool: ...
+
+    @abc.abstractmethod
+    def resolve_local_path(
+            self,
+            file_reference: FileReference,
+    ) -> Path: ...

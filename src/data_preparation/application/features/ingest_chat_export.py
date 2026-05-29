@@ -8,8 +8,9 @@ import json
 from typing import Iterator, Optional
 
 from common.application.base import ICommand
+from common.application.interfaces import IStorage
 from common.domain.value_objects import ID, UserName
-from data_preparation.application.interfaces import IStorage, IUnitOfWork
+from data_preparation.application.interfaces import IUnitOfWork
 from data_preparation.domain.entities import ChatExport, ParsedMessage
 from data_preparation.domain.value_objects import DateUnixtime
 

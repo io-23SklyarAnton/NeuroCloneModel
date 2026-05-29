@@ -7,11 +7,14 @@ from dishka.integrations.aiogram import setup_dishka
 import config
 from bot_operations.infrastructure.aiogram_bot_runner import AiogramBotRunnerService
 from bot_operations.infrastructure.bot_reconciler import BotReconciler
+from common.infrastructure.db.utils import init_db
 from dependencies import AppProvider
 from handlers import create_bot_router, start_router
 
 
 async def main() -> None:
+    init_db()
+
     dp: Dispatcher = Dispatcher()
 
     dp.include_router(start_router)

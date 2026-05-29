@@ -11,9 +11,10 @@ import jinja2
 import pydantic
 
 from common.application.base import ICommand, Response
+from common.application.interfaces import IStorage
 from common.domain.value_objects import FileReference, ReplyPeriod, UserName
 from data_preparation.application import constants
-from data_preparation.application.interfaces import IStorage, IUnitOfWork
+from data_preparation.application.interfaces import IUnitOfWork
 from data_preparation.domain.entities import ChatExport, ParsedMessage, TrainingDataset
 from utils import get_now_datetime
 

@@ -18,6 +18,7 @@ from bot_operations.application.features import (
     run_bot,
 )
 from bot_operations.infrastructure.db import SqlAlchemyUnitOfWork as BotOpsUoW
+from common.application.interfaces import IStorage
 from common.infrastructure.db.utils import get_session_maker
 from constants import BASE_PATH
 from data_preparation.application.features import (
@@ -25,7 +26,6 @@ from data_preparation.application.features import (
     ingest_chat_export,
     process_chat_threads,
 )
-from data_preparation.application.interfaces import IStorage
 from data_preparation.infrastructure.db import SqlAlchemyUnitOfWork as DataPrepUoW
 from data_preparation.infrastructure.local.storage import LocalStorage
 from infrastructure.llm import IInferenceEngine, MLXInferenceEngine
@@ -104,6 +104,7 @@ def build_train_lora_adapter_handler(
     return train_lora_adapter.CommandHandler(
         uow=uow,
         inference_engine=build_inference_engine(),
+        storage=build_storage(),
     )
 
 

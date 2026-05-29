@@ -3,8 +3,11 @@ __all__ = [
     "CommandHandler",
 ]
 
+from pathlib import Path
+
 from common.application.base import ICommand, Response
-from common.domain.value_objects import ID, FileReference
+from common.application.interfaces import IStorage
+from common.domain.value_objects import FileReference, ID
 from infrastructure.llm import IInferenceEngine
 from model_engine.application.interfaces import IUnitOfWork
 from model_engine.domain.entities import NeuroClone
@@ -21,9 +24,11 @@ class CommandHandler:
             self,
             uow: IUnitOfWork,
             inference_engine: IInferenceEngine,
+            storage: IStorage,
     ) -> None:
         self._uow = uow
         self._inference_engine = inference_engine
+        self._storage = storage
 
     async def handle(
             self,
@@ -35,11 +40,13 @@ class CommandHandler:
         await self._uow.commit()
 
         adapter_file_reference: FileReference = self._build_adapter_file_reference(neuroclone_id=neuroclone.id)
+        train_data_path: Path = self._storage.resolve_local_path(neuroclone.dataset_file_reference)
+        adapter_path: Path = self._storage.resolve_local_path(adapter_file_reference)
 
         try:
             await self._inference_engine.train_lora(
-                train_data_path=neuroclone.dataset_file_reference.full_path,
-                adapter_path=adapter_file_reference.full_path,
+                train_data_path=str(train_data_path),
+                adapter_path=str(adapter_path),
             )
         except Exception as exc:
             neuroclone.mark_failed()
