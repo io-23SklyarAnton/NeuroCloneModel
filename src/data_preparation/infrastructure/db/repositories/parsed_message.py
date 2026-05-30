@@ -73,17 +73,19 @@ class ParsedMessageRepository(
         db_messages: list[DBParsedMessage] = query.all()
         return self.get_all(db_messages)
 
-    async def get_all_by_chat_export_id(
+    async def get_target_user_sequence_numbers_by_chat_export_id(
             self,
             chat_export_id: ChatExport.ChatID,
-    ) -> list[ParsedMessageAggregate]:
-        query: Query = self.base_query()
+            target_user_name: UserName,
+    ) -> list[int]:
+        query: Query = self._session.query(self.model.sequence_number)
 
         query = self._filter_by_chat_export_id(query, chat_export_id)
+        query = query.filter(self.model.from_user == target_user_name.value)
         query = query.order_by(self.model.sequence_number.asc())
 
-        db_messages: list[DBParsedMessage] = query.all()
-        return self.get_all(db_messages)
+        rows: list[tuple[int]] = query.all()
+        return [int(row[0]) for row in rows]
 
     async def get_by_thread_id(
             self,

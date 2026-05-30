@@ -3,7 +3,7 @@ __all__ = ["IParsedMessageRepository"]
 import abc
 from typing import Optional
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.infrastructure.db.i_base_repository import IBaseRepository
 from data_preparation.domain.entities import ChatExport, ParsedMessage
 
@@ -30,10 +30,11 @@ class IParsedMessageRepository(IBaseRepository[ParsedMessage]):
     ) -> list[ParsedMessage]: ...
 
     @abc.abstractmethod
-    async def get_all_by_chat_export_id(
+    async def get_target_user_sequence_numbers_by_chat_export_id(
             self,
             chat_export_id: ChatExport.ChatID,
-    ) -> list[ParsedMessage]: ...
+            target_user_name: UserName,
+    ) -> list[int]: ...
 
     @abc.abstractmethod
     async def get_by_thread_id(

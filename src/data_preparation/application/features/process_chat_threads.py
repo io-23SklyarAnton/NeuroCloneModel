@@ -13,7 +13,7 @@ import jinja2
 import pydantic
 
 from common.application.base import ICommand
-from common.domain.value_objects import ID, UserName
+from common.domain.value_objects import ID
 from infrastructure.llm import IInferenceEngine
 from data_preparation.application import constants
 from data_preparation.application.interfaces import IUnitOfWork
@@ -84,12 +84,15 @@ class CommandHandler:
             )
             return
 
-        all_messages: list[ParsedMessage] = await self._uow.parsed_message.get_all_by_chat_export_id(
-            command.chat_export_id,
+        target_seq_numbers: list[int] = await self._uow.parsed_message.get_target_user_sequence_numbers_by_chat_export_id(
+            chat_export_id=command.chat_export_id,
+            target_user_name=chat_export.target_user_name,
         )
+        target_positions: list[int] = [seq - 1 for seq in target_seq_numbers]
+
         segments: list[tuple[int, int]] = self._build_segments(
-            all_messages=all_messages,
-            target_user=chat_export.target_user_name,
+            target_positions=target_positions,
+            total_messages=chat_export.n_messages,
         )
 
         if not segments:
@@ -105,24 +108,46 @@ class CommandHandler:
         covered: int = sum(end - start for start, end in segments)
         print(
             f"ChatExport {chat_export.chat_id.value}: built {len(segments)} segment(s) "
-            f"covering {covered}/{len(all_messages)} messages."
+            f"covering {covered}/{chat_export.n_messages} messages."
         )
 
         for segment_idx, (start, end) in enumerate(segments, 1):
             self._active_threads = {}
-            segment_messages: list[ParsedMessage] = all_messages[start:end]
+            seg_len: int = end - start
             print(
-                f"Segment {segment_idx}/{len(segments)}: messages [{start}:{end}] "
-                f"({len(segment_messages)} msgs)"
+                f"Segment {segment_idx}/{len(segments)}: positions [{start}:{end}] "
+                f"({seg_len} msgs)"
             )
 
-            for offset in range(0, len(segment_messages), _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
-                batch: list[ParsedMessage] = segment_messages[
-                    offset: offset + _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT
-                ]
-                messages_sub: list[ParsedMessage] = segment_messages[
-                    offset + 1: offset + 1 + _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT + constants.W_SUB
-                ]
+            for in_seg_offset in range(0, seg_len, _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
+                global_offset: int = start + in_seg_offset
+                batch_limit: int = min(
+                    _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
+                    seg_len - in_seg_offset,
+                )
+
+                batch: list[ParsedMessage] = await self._uow.parsed_message.get_batch_by_chat_export_id(
+                    chat_export_id=command.chat_export_id,
+                    offset=global_offset,
+                    limit=batch_limit,
+                )
+
+                sub_offset: int = global_offset + 1
+                sub_limit: int = max(
+                    0,
+                    min(
+                        _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT + constants.W_SUB,
+                        end - sub_offset,
+                    ),
+                )
+                if sub_limit > 0:
+                    messages_sub: list[ParsedMessage] = await self._uow.parsed_message.get_batch_by_chat_export_id(
+                        chat_export_id=command.chat_export_id,
+                        offset=sub_offset,
+                        limit=sub_limit,
+                    )
+                else:
+                    messages_sub = []
 
                 await self._process_batch(
                     messages=batch,
@@ -153,32 +178,28 @@ class CommandHandler:
 
     def _build_segments(
             self,
-            all_messages: list[ParsedMessage],
-            target_user: UserName,
+            target_positions: list[int],
+            total_messages: int,
     ) -> list[tuple[int, int]]:
-        target_indices: list[int] = [
-            idx for idx, message in enumerate(all_messages)
-            if message.from_user.value == target_user.value
-        ]
-        if not target_indices:
+        if not target_positions:
             return []
 
         raw_segments: list[tuple[int, int]] = []
         cursor: int = 0
-        while cursor < len(target_indices):
-            first: int = target_indices[cursor]
+        while cursor < len(target_positions):
+            first: int = target_positions[cursor]
             start: int = max(0, first - constants.N_PREAMBLE)
 
             last: int = first
             nxt: int = cursor + 1
-            while nxt < len(target_indices):
-                gap: int = target_indices[nxt] - last - 1
+            while nxt < len(target_positions):
+                gap: int = target_positions[nxt] - last - 1
                 if gap >= constants.N_SILENCE_THRESHOLD:
                     break
-                last = target_indices[nxt]
+                last = target_positions[nxt]
                 nxt += 1
 
-            end: int = min(len(all_messages), last + 1 + constants.W_SUB)
+            end: int = min(total_messages, last + 1 + constants.W_SUB)
             raw_segments.append((start, end))
             cursor = nxt
 

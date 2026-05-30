@@ -2,7 +2,7 @@ __all__ = ["InMemoryParsedMessageRepository"]
 
 from typing import Optional
 
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from common.infrastructure.db.in_memory_repository import InMemoryBaseRepository
 from data_preparation.application.interfaces.repositories import IParsedMessageRepository
 from data_preparation.domain.entities import ChatExport, ParsedMessage
@@ -42,17 +42,19 @@ class InMemoryParsedMessageRepository(InMemoryBaseRepository[ParsedMessage], IPa
 
         return chat_messages[offset:offset + limit]
 
-    async def get_all_by_chat_export_id(
+    async def get_target_user_sequence_numbers_by_chat_export_id(
             self,
             chat_export_id: ChatExport.ChatID,
-    ) -> list[ParsedMessage]:
-        chat_messages: list[ParsedMessage] = [
-            message for message in self._storage.values()
+            target_user_name: UserName,
+    ) -> list[int]:
+        seq_numbers: list[int] = [
+            message.sequence_number.value
+            for message in self._storage.values()
             if message.chat_export_id == chat_export_id
+            and message.from_user.value == target_user_name.value
         ]
-        chat_messages.sort(key=lambda m: m.sequence_number.value)
-
-        return chat_messages
+        seq_numbers.sort()
+        return seq_numbers
 
     async def get_by_thread_id(
             self,
