@@ -1,5 +1,6 @@
 __all__ = ["create_router"]
 
+import asyncio
 from typing import Optional
 
 from aiogram import F, Router
@@ -13,6 +14,10 @@ from bot_operations.application.features import (
 from bot_operations.domain.entities import LiveChat, LiveMessage
 from common.domain.value_objects import ID, UserName
 from common.exceptions.client.malformed_request import MissingUserException
+
+CHARS_PER_SECOND = 15.0
+MIN_TYPING_DELAY = 0.5
+MAX_TYPING_DELAY = 4.0
 
 
 def create_router() -> Router:
@@ -53,6 +58,30 @@ def create_router() -> Router:
         if response.reply_text is None:
             return
 
-        await message.answer(response.reply_text)
+        await _send_split_response(message, response.reply_text)
 
     return router
+
+
+async def _send_split_response(
+        message: Message,
+        full_reply_text: str,
+) -> None:
+    parts = full_reply_text.split("\n")
+
+    for part in parts:
+        clean_part = part.strip()
+
+        if not clean_part:
+            continue
+
+        await message.bot.send_chat_action(
+            chat_id=message.chat.id,
+            action="typing"
+        )
+
+        calculated_delay = len(clean_part) / CHARS_PER_SECOND
+        typing_delay = max(MIN_TYPING_DELAY, min(calculated_delay, MAX_TYPING_DELAY))
+
+        await asyncio.sleep(typing_delay)
+        await message.answer(clean_part)
