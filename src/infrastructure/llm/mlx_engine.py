@@ -51,10 +51,10 @@ class MLXInferenceEngine(IInferenceEngine):
         kwargs: dict[str, Any] = dataclasses.field(compare=False)
 
     _LORA_PARAMETERS: dict[str, Any] = {
-        "rank": 8,
+        "rank": 4,
         "alpha": 16.0,
         "scale": 2.0,
-        "dropout": 0.0,
+        "dropout": 0.05,
     }
     _BUCKET_CANDIDATES: list[int] = [128, 256, 512, 1024, 2048, 4096]
     _SNAPSHOT_EVERY_N_BATCHES: int = 1
@@ -256,7 +256,10 @@ class MLXInferenceEngine(IInferenceEngine):
                 prompt=delta_tokens,
                 prompt_cache=prompt_cache,
                 max_tokens=max_tokens,
-                sampler=make_sampler(temp=temp),
+                sampler=make_sampler(
+                    temp=temp,
+                    top_p=constants.IMITATION_TOP_P,
+                ),
                 verbose=False,
             )
         finally:
@@ -536,20 +539,38 @@ class MLXInferenceEngine(IInferenceEngine):
             adapter_path: str,
     ) -> None:
         total_batches: int = sum(len(specs) for specs in bucket_plan.values())
-        print(f"Starting training for {constants.LORA_ITERS} epochs...")
+        n_epochs: int = self._adaptive_epochs(updates_per_epoch=total_batches)
+        total_updates: int = n_epochs * total_batches
+        print(
+            f"Starting training: {n_epochs} epoch(s) x {total_batches} batches = "
+            f"{total_updates} updates (target {constants.LORA_TARGET_UPDATES})"
+        )
 
-        for epoch in range(constants.LORA_ITERS):
+        for epoch in range(n_epochs):
             await self._run_epoch_with_yielding(
                 epoch=epoch,
+                n_epochs=n_epochs,
                 bucket_plan=bucket_plan,
                 step_fn=step_fn,
                 total_batches=total_batches,
                 adapter_path=adapter_path,
             )
 
+    @staticmethod
+    def _adaptive_epochs(updates_per_epoch: int) -> int:
+        if updates_per_epoch <= 0:
+            return constants.LORA_MIN_EPOCHS
+
+        raw: int = constants.LORA_TARGET_UPDATES // updates_per_epoch
+        return max(
+            constants.LORA_MIN_EPOCHS,
+            min(constants.LORA_MAX_EPOCHS, raw),
+        )
+
     async def _run_epoch_with_yielding(
             self,
             epoch: int,
+            n_epochs: int,
             bucket_plan: BucketPlan,
             step_fn: StepFn,
             total_batches: int,
@@ -576,6 +597,7 @@ class MLXInferenceEngine(IInferenceEngine):
                 epoch_time += elapsed
                 self._log_batch_progress(
                     epoch=epoch,
+                    n_epochs=n_epochs,
                     bucket_size=bucket_size,
                     seen=seen,
                     total_batches=total_batches,
@@ -625,6 +647,7 @@ class MLXInferenceEngine(IInferenceEngine):
     def _log_batch_progress(
             self,
             epoch: int,
+            n_epochs: int,
             bucket_size: int,
             seen: int,
             total_batches: int,
@@ -633,7 +656,7 @@ class MLXInferenceEngine(IInferenceEngine):
     ) -> None:
         peak_gb: float = self._safe_get_peak_memory_gb()
         print(
-            f"Epoch {epoch + 1}/{constants.LORA_ITERS} | "
+            f"Epoch {epoch + 1}/{n_epochs} | "
             f"Bucket {bucket_size} | Batch {seen}/{total_batches} | "
             f"Loss: {loss_val:.4f} | Step: {elapsed:.2f}s | Peak: {peak_gb:.2f}GB"
         )

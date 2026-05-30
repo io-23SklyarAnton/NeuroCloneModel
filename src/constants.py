@@ -3,14 +3,15 @@ import pathlib
 
 BASE_PATH = pathlib.Path(__file__).resolve().parent
 
-MAX_TOKENS_IMITATION = 150
-TEMP_IMITATION = 0.7
-
-LORA_ITERS = 3
+LORA_TARGET_UPDATES = 400
+LORA_MIN_EPOCHS = 1
+LORA_MAX_EPOCHS = 3
 LORA_BATCH_SIZE = 4
-LORA_LAYERS = 16
+LORA_LAYERS = 8
 LORA_LR = 2e-5
 LORA_MAX_SEQ_LENGTH = 512
+
+IMITATION_TOP_P = 0.9
 
 
 class AvailableModel(enum.StrEnum):
