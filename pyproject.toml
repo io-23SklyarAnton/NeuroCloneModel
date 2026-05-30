@@ -17,6 +17,7 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "celery>=5.6.3",
     "redis>=8.0.0",
+    "aiohttp>=3.13.5",
 ]
 readme = "README.md"
 requires-python = ">=  3.12.7"
@@ -41,12 +42,14 @@ infra-down = "docker compose down"
 
 bot = { cmd = "python src/app.py", env-file = ".env" }
 
+inference-server = { cmd = "python src/inference_server.py", env-file = ".env" }
+
 worker-cpu = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src worker --pool=prefork --concurrency=4 --queues=celery --loglevel=info", env-file = ".env" }
-worker-ml = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src worker --pool=solo --queues=ml --loglevel=info", env-file = ".env" }
+worker-ml = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src worker --pool=prefork --concurrency=2 --queues=ml --loglevel=info", env-file = ".env" }
 
 beat = { cmd = "celery -A infrastructure.celery.celery_app --workdir=src beat --loglevel=info", env-file = ".env" }
 
-start-all = "sh -c 'trap \"kill 0\" EXIT INT TERM; rye run bot & rye run worker-cpu & rye run worker-ml & rye run beat & wait'"
+start-all = "sh -c 'trap \"kill 0\" EXIT INT TERM; rye run inference-server & rye run bot & rye run worker-cpu & rye run worker-ml & rye run beat & wait'"
 
 trigger = { cmd = "python src/scripts/trigger.py", env-file = ".env" }
 reset = { cmd = "python src/scripts/reset.py", env-file = ".env" }

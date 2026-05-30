@@ -30,6 +30,12 @@ class IParsedMessageRepository(IBaseRepository[ParsedMessage]):
     ) -> list[ParsedMessage]: ...
 
     @abc.abstractmethod
+    async def get_all_by_chat_export_id(
+            self,
+            chat_export_id: ChatExport.ChatID,
+    ) -> list[ParsedMessage]: ...
+
+    @abc.abstractmethod
     async def get_by_thread_id(
             self,
             thread_id: ID,

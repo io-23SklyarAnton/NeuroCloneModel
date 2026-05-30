@@ -6,20 +6,12 @@ __all__ = [
     "train_lora_adapter_task",
     "assign_neuroclone_to_bot_task",
     "run_bot_task",
-    "generate_persona_reply_task",
-    "GeneratePersonaReplyPayload",
 ]
-
-import uuid
-from typing import Optional
-
-import pydantic
 
 from bot_operations.application.features import (
     assign_neuroclone_to_bot,
     run_bot,
 )
-from bot_operations.application.interfaces import ChatContextMessage
 from data_preparation.application.features import (
     build_imitation_dataset,
     ingest_chat_export,
@@ -37,11 +29,6 @@ from model_engine.application.features import (
     create_neuroclone,
     train_lora_adapter,
 )
-
-
-class GeneratePersonaReplyPayload(pydantic.BaseModel):
-    neuroclone_id: uuid.UUID
-    context: list[ChatContextMessage]
 
 
 @task_with_custom_async(bind=True)
@@ -126,18 +113,3 @@ def run_bot_task(
     with deps.open_bot_ops_uow() as uow:
         handler = deps.build_run_bot_handler(uow)
         run_async(handler.handle(payload))
-
-
-@task_with_custom_async(bind=True)
-@catch_exceptions(is_critical=False)
-@set_request_id_from_task
-@validate_payload(GeneratePersonaReplyPayload)
-def generate_persona_reply_task(
-        payload: GeneratePersonaReplyPayload,
-) -> Optional[str]:
-    with deps.open_model_engine_uow() as uow:
-        service = deps.build_persona_inference_service(uow)
-        return run_async(service.generate_reply(
-            neuroclone_id=payload.neuroclone_id,
-            context=payload.context,
-        ))

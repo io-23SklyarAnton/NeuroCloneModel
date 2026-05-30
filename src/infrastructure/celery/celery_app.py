@@ -42,7 +42,6 @@ celery_app.conf.update(
 celery_app.conf.task_routes = {
     "process_chat_threads_task": {"queue": "ml"},
     "train_lora_adapter_task": {"queue": "ml"},
-    "generate_persona_reply_task": {"queue": "ml"},
 }
 
 celery_app.conf.beat_schedule = {

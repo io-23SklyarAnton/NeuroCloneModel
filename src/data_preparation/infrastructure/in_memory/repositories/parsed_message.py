@@ -42,6 +42,18 @@ class InMemoryParsedMessageRepository(InMemoryBaseRepository[ParsedMessage], IPa
 
         return chat_messages[offset:offset + limit]
 
+    async def get_all_by_chat_export_id(
+            self,
+            chat_export_id: ChatExport.ChatID,
+    ) -> list[ParsedMessage]:
+        chat_messages: list[ParsedMessage] = [
+            message for message in self._storage.values()
+            if message.chat_export_id == chat_export_id
+        ]
+        chat_messages.sort(key=lambda m: m.sequence_number.value)
+
+        return chat_messages
+
     async def get_by_thread_id(
             self,
             thread_id: ID,

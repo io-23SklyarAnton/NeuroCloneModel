@@ -73,6 +73,18 @@ class ParsedMessageRepository(
         db_messages: list[DBParsedMessage] = query.all()
         return self.get_all(db_messages)
 
+    async def get_all_by_chat_export_id(
+            self,
+            chat_export_id: ChatExport.ChatID,
+    ) -> list[ParsedMessageAggregate]:
+        query: Query = self.base_query()
+
+        query = self._filter_by_chat_export_id(query, chat_export_id)
+        query = query.order_by(self.model.sequence_number.asc())
+
+        db_messages: list[DBParsedMessage] = query.all()
+        return self.get_all(db_messages)
+
     async def get_by_thread_id(
             self,
             thread_id: ID,

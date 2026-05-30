@@ -52,6 +52,7 @@ class CommandHandler:
             neuroclone.mark_failed()
             self._uow.neuroclone.update(neuroclone)
             await self._uow.commit()
+            print(f"Error during training NeuroClone {neuroclone.id.value}: {exc}")
             return Response(
                 message=f"NeuroClone {neuroclone.id.value} training failed: {exc}",
             )

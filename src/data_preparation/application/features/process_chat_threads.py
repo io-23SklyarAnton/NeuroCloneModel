@@ -13,7 +13,7 @@ import jinja2
 import pydantic
 
 from common.application.base import ICommand
-from common.domain.value_objects import ID
+from common.domain.value_objects import ID, UserName
 from infrastructure.llm import IInferenceEngine
 from data_preparation.application import constants
 from data_preparation.application.interfaces import IUnitOfWork
@@ -84,13 +84,51 @@ class CommandHandler:
             )
             return
 
-        for offset in range(0, chat_export.n_messages, _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
-            await self._process_batch(
-                chat_export_id=command.chat_export_id,
-                offset=offset,
+        all_messages: list[ParsedMessage] = await self._uow.parsed_message.get_all_by_chat_export_id(
+            command.chat_export_id,
+        )
+        segments: list[tuple[int, int]] = self._build_segments(
+            all_messages=all_messages,
+            target_user=chat_export.target_user_name,
+        )
+
+        if not segments:
+            print(
+                f"ChatExport {chat_export.chat_id.value} has no messages from target user "
+                f"'{chat_export.target_user_name.value}'; marking as FAILED."
+            )
+            chat_export.mark_failed()
+            self._uow.chat_export.update(chat_export)
+            await self._uow.commit()
+            return
+
+        covered: int = sum(end - start for start, end in segments)
+        print(
+            f"ChatExport {chat_export.chat_id.value}: built {len(segments)} segment(s) "
+            f"covering {covered}/{len(all_messages)} messages."
+        )
+
+        for segment_idx, (start, end) in enumerate(segments, 1):
+            self._active_threads = {}
+            segment_messages: list[ParsedMessage] = all_messages[start:end]
+            print(
+                f"Segment {segment_idx}/{len(segments)}: messages [{start}:{end}] "
+                f"({len(segment_messages)} msgs)"
             )
 
-            await self._uow.commit()
+            for offset in range(0, len(segment_messages), _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
+                batch: list[ParsedMessage] = segment_messages[
+                    offset: offset + _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT
+                ]
+                messages_sub: list[ParsedMessage] = segment_messages[
+                    offset + 1: offset + 1 + _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT + constants.W_SUB
+                ]
+
+                await self._process_batch(
+                    messages=batch,
+                    messages_sub=messages_sub,
+                )
+                await self._uow.commit()
 
         chat_export.mark_ready()
         self._uow.chat_export.update(chat_export)
@@ -103,26 +141,56 @@ class CommandHandler:
 
     async def _process_batch(
             self,
-            chat_export_id: ChatExport.ChatID,
-            offset: int,
+            messages: list[ParsedMessage],
+            messages_sub: list[ParsedMessage],
     ) -> None:
-        messages: list[ParsedMessage] = await self._get_batch_of_messages(
-            chat_export_id=chat_export_id,
-            offset=offset,
-            limit=_BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
-        )
-        messages_sub: list[ParsedMessage] = await self._get_batch_of_messages(
-            chat_export_id=chat_export_id,
-            offset=offset + 1,
-            limit=constants.W_SUB + _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT,
-        )
-
         for i, message in enumerate(messages, 1):
             await self._process_single_message(
                 i=i,
                 message=message,
                 messages_sub=messages_sub,
             )
+
+    def _build_segments(
+            self,
+            all_messages: list[ParsedMessage],
+            target_user: UserName,
+    ) -> list[tuple[int, int]]:
+        target_indices: list[int] = [
+            idx for idx, message in enumerate(all_messages)
+            if message.from_user.value == target_user.value
+        ]
+        if not target_indices:
+            return []
+
+        raw_segments: list[tuple[int, int]] = []
+        cursor: int = 0
+        while cursor < len(target_indices):
+            first: int = target_indices[cursor]
+            start: int = max(0, first - constants.N_PREAMBLE)
+
+            last: int = first
+            nxt: int = cursor + 1
+            while nxt < len(target_indices):
+                gap: int = target_indices[nxt] - last - 1
+                if gap >= constants.N_SILENCE_THRESHOLD:
+                    break
+                last = target_indices[nxt]
+                nxt += 1
+
+            end: int = min(len(all_messages), last + 1 + constants.W_SUB)
+            raw_segments.append((start, end))
+            cursor = nxt
+
+        merged: list[tuple[int, int]] = []
+        for seg_start, seg_end in raw_segments:
+            if merged and seg_start <= merged[-1][1]:
+                prev_start, prev_end = merged[-1]
+                merged[-1] = (prev_start, max(prev_end, seg_end))
+            else:
+                merged.append((seg_start, seg_end))
+
+        return merged
 
     async def _process_single_message(
             self,
@@ -293,18 +361,6 @@ class CommandHandler:
 
         return self._get_thread_from_active_threads_by_id(
             thread_id=decision.thread_id,
-        )
-
-    async def _get_batch_of_messages(
-            self,
-            chat_export_id: ChatExport.ChatID,
-            offset: int,
-            limit: int,
-    ) -> list[ParsedMessage]:
-        return await self._uow.parsed_message.get_batch_by_chat_export_id(
-            chat_export_id=chat_export_id,
-            offset=offset,
-            limit=limit,
         )
 
     def _add_thread_to_active(

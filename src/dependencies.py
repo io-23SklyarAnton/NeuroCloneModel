@@ -3,6 +3,7 @@ from typing import Iterable, Optional
 from dishka import Provider, Scope, provide
 from sqlalchemy.orm import sessionmaker
 
+import config
 from bot_operations.application.features import (
     AssignNeuroCloneToBotCommandHandler,
     CreateBotCommandHandler,
@@ -18,8 +19,8 @@ from bot_operations.infrastructure.aiogram_bot_runner import AiogramBotRunnerSer
 from bot_operations.infrastructure.db import (
     SqlAlchemyUnitOfWork as BotOpsSqlAlchemyUoW,
 )
-from bot_operations.infrastructure.remote_persona_reply_service import (
-    RemotePersonaReplyService,
+from bot_operations.infrastructure.local_persona_reply_service import (
+    LocalPersonaReplyService,
 )
 from common.application.interfaces import IEventBus, IStorage
 from common.infrastructure.db.utils import get_session_maker
@@ -36,15 +37,14 @@ from iam.application.features import RegisterUserCommandHandler
 from iam.application.interfaces import IUnitOfWork as IamUoW
 from iam.infrastructure.db import SqlAlchemyUnitOfWork as IamSqlAlchemyUoW
 from infrastructure.celery.event_bus import CeleryEventBus
+from infrastructure.llm import HttpInferenceEngine, IInferenceEngine
 from model_engine.application.interfaces import (
     IUnitOfWork as ModelEngineUoW,
 )
+from model_engine.application.services import PersonaInferenceService
 from model_engine.infrastructure.db import (
     SqlAlchemyUnitOfWork as ModelEngineSqlAlchemyUoW,
 )
-
-
-_PERSONA_REPLY_TIMEOUT_SECONDS: float = 60.0
 
 
 class AppProvider(Provider):
@@ -74,9 +74,22 @@ class AppProvider(Provider):
         )
 
     @provide(scope=Scope.APP)
-    def get_persona_reply_service(self) -> PersonaReplyService:
-        return RemotePersonaReplyService(
-            timeout_seconds=_PERSONA_REPLY_TIMEOUT_SECONDS,
+    def get_inference_engine(self) -> IInferenceEngine:
+        return HttpInferenceEngine(base_url=config.INFERENCE_SERVER_URL)
+
+    @provide(scope=Scope.REQUEST)
+    def get_persona_reply_service(
+            self,
+            uow: ModelEngineUoW,
+            inference_engine: IInferenceEngine,
+            storage: IStorage,
+    ) -> PersonaReplyService:
+        return LocalPersonaReplyService(
+            persona_inference_service=PersonaInferenceService(
+                uow=uow,
+                inference_engine=inference_engine,
+                storage=storage,
+            ),
         )
 
     @provide(scope=Scope.REQUEST)

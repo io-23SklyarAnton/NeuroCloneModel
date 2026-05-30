@@ -1,7 +1,6 @@
 __all__ = [
     "build_storage",
     "build_inference_engine",
-    "build_persona_inference_service",
     "build_ingest_chat_export_handler",
     "build_process_chat_threads_handler",
     "build_build_imitation_dataset_handler",
@@ -14,6 +13,7 @@ __all__ = [
     "open_bot_ops_uow",
 ]
 
+import config
 from bot_operations.application.features import (
     assign_neuroclone_to_bot,
     run_bot,
@@ -21,7 +21,7 @@ from bot_operations.application.features import (
 from bot_operations.infrastructure.db import SqlAlchemyUnitOfWork as BotOpsUoW
 from common.application.interfaces import IStorage
 from common.infrastructure.db.utils import get_session_maker
-from constants import BASE_PATH, AvailableModel
+from constants import BASE_PATH
 from data_preparation.application.features import (
     build_imitation_dataset,
     ingest_chat_export,
@@ -29,16 +29,14 @@ from data_preparation.application.features import (
 )
 from data_preparation.infrastructure.db import SqlAlchemyUnitOfWork as DataPrepUoW
 from data_preparation.infrastructure.local.storage import LocalStorage
-from infrastructure.llm import IInferenceEngine, MLXInferenceEngine
+from infrastructure.llm import HttpInferenceEngine, IInferenceEngine
 from model_engine.application.features import (
     create_neuroclone,
     train_lora_adapter,
 )
-from model_engine.application.services import PersonaInferenceService
 from model_engine.infrastructure.db import SqlAlchemyUnitOfWork as ModelEngineUoW
 
 _storage: IStorage | None = None
-_inference_engine: IInferenceEngine | None = None
 
 
 def build_storage() -> IStorage:
@@ -49,12 +47,7 @@ def build_storage() -> IStorage:
 
 
 def build_inference_engine() -> IInferenceEngine:
-    global _inference_engine
-    if _inference_engine is None:
-        _inference_engine = MLXInferenceEngine(
-            base_model=AvailableModel.LLAMA_3_2_3B  # TODO: make more flexible
-        )
-    return _inference_engine
+    return HttpInferenceEngine(base_url=config.INFERENCE_SERVER_URL)
 
 
 def open_data_prep_uow() -> DataPrepUoW:
@@ -92,16 +85,6 @@ def build_build_imitation_dataset_handler(
 ) -> build_imitation_dataset.CommandHandler:
     return build_imitation_dataset.CommandHandler(
         uow=uow,
-        storage=build_storage(),
-    )
-
-
-def build_persona_inference_service(
-        uow: ModelEngineUoW,
-) -> PersonaInferenceService:
-    return PersonaInferenceService(
-        uow=uow,
-        inference_engine=build_inference_engine(),
         storage=build_storage(),
     )
 

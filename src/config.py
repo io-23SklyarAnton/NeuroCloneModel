@@ -28,3 +28,11 @@ REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
 
 REDIS_LINK: str = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+
+INFERENCE_SERVER_HOST: str = os.getenv("INFERENCE_SERVER_HOST", "127.0.0.1")
+INFERENCE_SERVER_PORT: int = int(os.getenv("INFERENCE_SERVER_PORT", "8765"))
+INFERENCE_SERVER_URL: str = (
+    os.getenv("INFERENCE_SERVER_URL")
+    or f"http://{INFERENCE_SERVER_HOST}:{INFERENCE_SERVER_PORT}"
+)
+INFERENCE_BASE_MODEL: str = os.getenv("INFERENCE_BASE_MODEL", "LLAMA_3_2_3B")
