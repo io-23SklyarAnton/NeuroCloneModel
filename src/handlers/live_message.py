@@ -4,6 +4,7 @@ import asyncio
 from typing import Optional
 
 from aiogram import F, Router
+from aiogram.enums import ChatType, MessageEntityType
 from aiogram.types import Message
 from dishka.integrations.aiogram import FromDishka, inject
 
@@ -46,12 +47,15 @@ def create_router() -> Router:
         if not user_name_value:
             return
 
+        force_reply: bool = await _should_force_reply(message)
+
         response = await command_handler.handle(
             ReceiveChatMessageCommand(
                 bot_id=domain_bot_id,
                 chat_external_id=LiveChat.ExternalID(value=message.chat.id),
                 user_name=UserName(value=user_name_value),
                 text=LiveMessage.Text(value=text),
+                force_reply=force_reply,
             ),
         )
 
@@ -63,18 +67,54 @@ def create_router() -> Router:
     return router
 
 
+async def _should_force_reply(message: Message) -> bool:
+    if message.chat.type == ChatType.PRIVATE:
+        return True
+
+    if await _is_bot_mentioned(message):
+        return True
+
+    return await _is_reply_to_bot(message)
+
+
+async def _is_reply_to_bot(message: Message) -> bool:
+    reply_to: Optional[Message] = message.reply_to_message
+    if reply_to is None or reply_to.from_user is None:
+        return False
+
+    bot_user = await message.bot.me()
+    return reply_to.from_user.id == bot_user.id
+
+
+async def _is_bot_mentioned(message: Message) -> bool:
+    entities = message.entities or []
+    if not entities:
+        return False
+
+    bot_user = await message.bot.me()
+    bot_id: int = bot_user.id
+    bot_username: Optional[str] = bot_user.username
+    text: str = message.text or ""
+
+    for entity in entities:
+        if entity.type == MessageEntityType.MENTION and bot_username:
+            mention_text: str = text[entity.offset: entity.offset + entity.length]
+            if mention_text.lower() == f"@{bot_username}".lower():
+                return True
+        elif entity.type == MessageEntityType.TEXT_MENTION:
+            if entity.user is not None and entity.user.id == bot_id:
+                return True
+
+    return False
+
+
 async def _send_split_response(
         message: Message,
         full_reply_text: str,
 ) -> None:
-    parts = full_reply_text.split("\n")
+    parts: list[str] = [p.strip() for p in full_reply_text.split("\n") if p.strip()]
 
-    for part in parts:
-        clean_part = part.strip()
-
-        if not clean_part:
-            continue
-
+    for idx, clean_part in enumerate(parts):
         await message.bot.send_chat_action(
             chat_id=message.chat.id,
             action="typing"
@@ -84,4 +124,8 @@ async def _send_split_response(
         typing_delay = max(MIN_TYPING_DELAY, min(calculated_delay, MAX_TYPING_DELAY))
 
         await asyncio.sleep(typing_delay)
-        await message.answer(clean_part)
+
+        if idx == 0:
+            await message.reply(clean_part)
+        else:
+            await message.answer(clean_part)

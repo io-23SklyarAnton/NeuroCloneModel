@@ -25,6 +25,7 @@ class Command(ICommand):
     chat_external_id: LiveChat.ExternalID
     user_name: UserName
     text: LiveMessage.Text
+    force_reply: bool = False
 
 
 class Response(pydantic.BaseModel):
@@ -65,6 +66,7 @@ class CommandHandler:
         reply_text: Optional[str] = await self._maybe_generate_reply(
             bot=bot,
             live_chat=live_chat,
+            force_reply=command.force_reply,
         )
         if reply_text is not None:
             bot_message: LiveMessage = LiveMessage.create_bot_message(
@@ -87,6 +89,7 @@ class CommandHandler:
             self,
             bot: Bot,
             live_chat: LiveChat,
+            force_reply: bool,
     ) -> Optional[str]:
         if bot.neuroclone_id is None:
             return None
@@ -94,6 +97,7 @@ class CommandHandler:
         if not self._should_reply(
                 reply_period=bot.reply_period,
                 live_chat=live_chat,
+                force_reply=force_reply,
         ):
             return None
 
@@ -112,7 +116,11 @@ class CommandHandler:
     def _should_reply(
             reply_period: Optional[ReplyPeriod],
             live_chat: LiveChat,
+            force_reply: bool,
     ) -> bool:
+        if force_reply:
+            return True
+
         if reply_period is None:
             return False
 
