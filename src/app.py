@@ -1,7 +1,10 @@
 import asyncio
 import logging
+from typing import Optional
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.client.telegram import TelegramAPIServer
 from dishka import make_async_container
 from dishka.integrations.aiogram import setup_dishka
 
@@ -28,6 +31,18 @@ def _resolve_main_bot_token() -> str:
     return token
 
 
+def _build_main_bot(token: str) -> Bot:
+    url: Optional[str] = config.TELEGRAM_LOCAL_API_URL
+    if not url:
+        logging.getLogger("app").info("Main bot using CLOUD API (api.telegram.org)")
+        return Bot(token=token)
+
+    logging.getLogger("app").info("Main bot using LOCAL API at %s (is_local=True)", url)
+    local_server: TelegramAPIServer = TelegramAPIServer.from_base(url, is_local=True)
+    session: AiohttpSession = AiohttpSession(api=local_server)
+    return Bot(token=token, session=session)
+
+
 async def main() -> None:
     _setup_logging()
     init_db()
@@ -52,7 +67,7 @@ async def main() -> None:
     )
     await reconciler.start()
 
-    main_bot: Bot = Bot(token=main_bot_token)
+    main_bot: Bot = _build_main_bot(main_bot_token)
 
     try:
         await dp.start_polling(main_bot)

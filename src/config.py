@@ -5,6 +5,10 @@ ENV: str = os.getenv("ENV", "dev")
 
 MAIN_BOT_TOKEN: Optional[str] = os.getenv("MAIN_BOT_TOKEN")
 
+TELEGRAM_API_ID: Optional[str] = os.getenv("TELEGRAM_API_ID")
+TELEGRAM_API_HASH: Optional[str] = os.getenv("TELEGRAM_API_HASH")
+TELEGRAM_LOCAL_API_URL: Optional[str] = os.getenv("TELEGRAM_LOCAL_API_URL")
+
 DB_ENGINE: str = os.getenv("DB_ENGINE", "postgresql")
 DB_HOST: str = os.getenv("DB_HOST", "localhost" if ENV == "dev" else "")
 DB_PORT: int = int(os.getenv("DB_PORT", "5433"))
