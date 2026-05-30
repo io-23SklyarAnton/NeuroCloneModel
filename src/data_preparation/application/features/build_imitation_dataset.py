@@ -19,6 +19,8 @@ from data_preparation.application.interfaces import IUnitOfWork
 from data_preparation.domain.entities import ChatExport, ParsedMessage, TrainingDataset
 from utils import get_now_datetime
 
+_AGGREGATION_TIMEOUT_SECONDS = 120
+
 
 class Command(ICommand):
     chat_export_id: ChatExport.ChatID
@@ -131,41 +133,89 @@ class CommandHandler:
     ) -> list[ImitationPair]:
         pairs: list[CommandHandler.ImitationPair] = []
         context: list[ParsedMessage] = []
-        for message in messages:
-            if self._is_target_response(
-                    message=message,
+
+        index = 0
+        while index < len(messages):
+            current_message = messages[index]
+
+            if self._is_ready_for_imitation_pair(
+                    message=current_message,
                     target_user=target_user,
                     context=context,
             ):
-                pairs.append(self._build_pair(
-                    context=context,
-                    response=message,
+                aggregated_text, next_index = self._aggregate_target_messages(
+                    messages=messages,
+                    start_index=index,
+                    target_user=target_user
+                )
+
+                pairs.append(self._build_pair_aggregated(
+                    context=context.copy(),
+                    aggregated_response=aggregated_text,
                 ))
 
-            context.append(message)
+                context.extend(messages[index:next_index])
+                index = next_index
+            else:
+                context.append(current_message)
+                index += 1
 
         return pairs
 
-    def _is_target_response(
+    def _is_ready_for_imitation_pair(
             self,
             message: ParsedMessage,
             target_user: UserName,
-            context: list[ParsedMessage],
+            context: list[ParsedMessage]
+    ) -> bool:
+        return self._is_target_text_message(message, target_user) and bool(context)
+
+    def _aggregate_target_messages(
+            self,
+            messages: list[ParsedMessage],
+            start_index: int,
+            target_user: UserName
+    ) -> tuple[str, int]:
+        aggregated_parts: list[str] = []
+        last_timestamp = messages[start_index].date_unixtime.value
+        current_index = start_index
+
+        while current_index < len(messages):
+            next_message = messages[current_index]
+
+            if not self._is_target_text_message(next_message, target_user):
+                break
+
+            if self._is_timeout_exceeded(last_timestamp, next_message.date_unixtime.value):
+                break
+
+            aggregated_parts.append(next_message.text.value)
+            last_timestamp = next_message.date_unixtime.value
+            current_index += 1
+
+        return "\n".join(aggregated_parts), current_index
+
+    def _is_timeout_exceeded(self, last_timestamp: int, current_timestamp: int) -> bool:
+        return (current_timestamp - last_timestamp) > _AGGREGATION_TIMEOUT_SECONDS
+
+    def _is_target_text_message(
+            self,
+            message: ParsedMessage,
+            target_user: UserName,
     ) -> bool:
         return (
                 message.from_user.value == target_user.value
                 and message.message_type == ParsedMessage.Type.TEXT
-                and bool(context)
         )
 
-    def _build_pair(
+    def _build_pair_aggregated(
             self,
             context: list[ParsedMessage],
-            response: ParsedMessage,
+            aggregated_response: str,
     ) -> ImitationPair:
         return CommandHandler.ImitationPair(
             context=self._format_context(context),
-            expected_response=response.text.value,
+            expected_response=aggregated_response,
         )
 
     def _format_context(
