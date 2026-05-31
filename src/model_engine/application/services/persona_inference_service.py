@@ -83,9 +83,25 @@ class PersonaInferenceService:
             self,
             context: list[ChatContextMessage],
     ) -> str:
-        window: list[ChatContextMessage] = context[-self._window_size:]
+        deduped: list[ChatContextMessage] = self._dedupe_consecutive(context)
+        window: list[ChatContextMessage] = deduped[-self._window_size:]
         messages_data: list[dict[str, str]] = [
             {"sender": message.sender, "text": message.text}
             for message in window
         ]
         return self._template.render(messages=messages_data)
+
+    @staticmethod
+    def _dedupe_consecutive(
+            messages: list[ChatContextMessage],
+    ) -> list[ChatContextMessage]:
+        result: list[ChatContextMessage] = []
+        last_key: Optional[tuple[str, str]] = None
+        for message in messages:
+            normalized: str = " ".join(message.text.strip().lower().split())
+            key: tuple[str, str] = (message.sender, normalized)
+            if key == last_key:
+                continue
+            result.append(message)
+            last_key = key
+        return result
