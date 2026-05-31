@@ -113,10 +113,15 @@ class CommandHandler:
 
         for segment_idx, (start, end) in enumerate(segments, 1):
             self._active_threads = {}
+            await self._restore_active_threads_for_segment(
+                chat_export_id=command.chat_export_id,
+                seg_start_pos=start,
+                seg_end_pos=end,
+            )
             seg_len: int = end - start
             print(
                 f"Segment {segment_idx}/{len(segments)}: positions [{start}:{end}] "
-                f"({seg_len} msgs)"
+                f"({seg_len} msgs, restored {len(self._active_threads)} active thread(s))"
             )
 
             for in_seg_offset in range(0, seg_len, _BATCH_SIZE_DIALOGUE_DISENTANGLEMENT):
@@ -213,12 +218,39 @@ class CommandHandler:
 
         return merged
 
+    async def _restore_active_threads_for_segment(
+            self,
+            chat_export_id: ChatExport.ChatID,
+            seg_start_pos: int,
+            seg_end_pos: int,
+    ) -> None:
+        seq_start: int = seg_start_pos + 1
+        seq_end: int = seg_end_pos
+
+        thread_ids: list[ID] = await self._uow.parsed_message.get_recent_thread_ids_in_range(
+            chat_export_id=chat_export_id,
+            seq_start=seq_start,
+            seq_end=seq_end,
+            limit=constants.N_ACTIVE_THREADS,
+        )
+        if not thread_ids:
+            return
+
+        for thread_id in thread_ids:
+            thread: Optional[Thread] = await self._uow.thread.get_by_id_optional(thread_id)
+            if thread is None:
+                continue
+            self._active_threads[thread.id] = thread
+
     async def _process_single_message(
             self,
             i: int,
             message: ParsedMessage,
             messages_sub: list[ParsedMessage],
     ) -> None:
+        if message.thread_id is not None:
+            return
+
         start_time = time.perf_counter()
         determined_thread: Optional[Thread] = await self._determine_message_thread(
             i=i,

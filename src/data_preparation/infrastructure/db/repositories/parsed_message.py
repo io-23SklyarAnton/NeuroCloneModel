@@ -87,6 +87,28 @@ class ParsedMessageRepository(
         rows: list[tuple[int]] = query.all()
         return [int(row[0]) for row in rows]
 
+    async def get_recent_thread_ids_in_range(
+            self,
+            chat_export_id: ChatExport.ChatID,
+            seq_start: int,
+            seq_end: int,
+            limit: int,
+    ) -> list[ID]:
+        last_seq = func.max(self.model.sequence_number)
+
+        query: Query = self._session.query(self.model.thread_id, last_seq)
+
+        query = self._filter_by_chat_export_id(query, chat_export_id)
+        query = query.filter(self.model.sequence_number >= seq_start)
+        query = query.filter(self.model.sequence_number <= seq_end)
+        query = query.filter(self.model.thread_id.isnot(None))
+        query = query.group_by(self.model.thread_id)
+        query = query.order_by(last_seq.desc())
+        query = query.limit(limit)
+
+        rows: list[tuple] = query.all()
+        return [ID(value=row[0]) for row in rows]
+
     async def get_by_thread_id(
             self,
             thread_id: ID,

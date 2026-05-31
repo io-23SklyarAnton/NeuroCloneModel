@@ -56,6 +56,33 @@ class InMemoryParsedMessageRepository(InMemoryBaseRepository[ParsedMessage], IPa
         seq_numbers.sort()
         return seq_numbers
 
+    async def get_recent_thread_ids_in_range(
+            self,
+            chat_export_id: ChatExport.ChatID,
+            seq_start: int,
+            seq_end: int,
+            limit: int,
+    ) -> list[ID]:
+        last_seq_by_thread: dict[ID, int] = {}
+        for message in self._storage.values():
+            if message.chat_export_id != chat_export_id:
+                continue
+            if message.thread_id is None:
+                continue
+            seq: int = message.sequence_number.value
+            if seq < seq_start or seq > seq_end:
+                continue
+            existing: Optional[int] = last_seq_by_thread.get(message.thread_id)
+            if existing is None or seq > existing:
+                last_seq_by_thread[message.thread_id] = seq
+
+        ordered: list[tuple[ID, int]] = sorted(
+            last_seq_by_thread.items(),
+            key=lambda kv: kv[1],
+            reverse=True,
+        )
+        return [thread_id for thread_id, _ in ordered[:limit]]
+
     async def get_by_thread_id(
             self,
             thread_id: ID,

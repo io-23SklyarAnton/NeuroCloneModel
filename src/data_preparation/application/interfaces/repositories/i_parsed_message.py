@@ -37,6 +37,15 @@ class IParsedMessageRepository(IBaseRepository[ParsedMessage]):
     ) -> list[int]: ...
 
     @abc.abstractmethod
+    async def get_recent_thread_ids_in_range(
+            self,
+            chat_export_id: ChatExport.ChatID,
+            seq_start: int,
+            seq_end: int,
+            limit: int,
+    ) -> list[ID]: ...
+
+    @abc.abstractmethod
     async def get_by_thread_id(
             self,
             thread_id: ID,
