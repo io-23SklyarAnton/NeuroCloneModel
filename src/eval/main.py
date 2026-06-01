@@ -5,9 +5,9 @@ from pathlib import Path
 import constants
 from eval.disentanglement_evaluator import DisentanglementEvaluator
 from eval.load_dataset import load_irc_dataset_to_memory
-from ml_pipeline.application.features.process_chat_threads import Command, CommandHandler
-from ml_pipeline.infrastructure.in_memory.uow import InMemoryUnitOfWork
-from ml_pipeline.infrastructure.llm import MLXInferenceEngine
+from data_preparation.application.features.process_chat_threads import Command, CommandHandler
+from data_preparation.infrastructure.in_memory.uow import InMemoryUnitOfWork
+from infrastructure.llm.mlx_engine import MLXInferenceEngine
 
 
 async def main(
@@ -69,9 +69,9 @@ async def main(
 
 
 if __name__ == "__main__":
-    dataset_path = Path(__file__).parent / "CODI" / "validation.json"
-    cache_path = Path(__file__).parent / "cache" / "validation_predictions" / "qwen_3.5_4b.json"
-    base_model = constants.AvailableModel.QWEN_3_5_4B
+    dataset_path = Path(__file__).parent / "CODI" / "validation_uk.json"
+    cache_path = Path(__file__).parent / "cache" / "validation_predictions" / "llama3.2_ukrainian_best_settup.json"
+    base_model = constants.AvailableModel.LLAMA_3_2_3B
 
     asyncio.run(main(
         dataset_path=dataset_path,

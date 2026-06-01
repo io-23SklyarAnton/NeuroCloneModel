@@ -3,10 +3,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from common.domain.value_objects import UserName, OwnerTelegramID
-from ml_pipeline.domain.entities import ChatExport, ParsedMessage
-from ml_pipeline.domain.value_objects import DateUnixtime, ExportFileKey
-from ml_pipeline.infrastructure.in_memory.uow import InMemoryUnitOfWork
+from common.domain.value_objects import UserName, OwnerTelegramID, FileReference
+from data_preparation.domain.entities import ChatExport, ParsedMessage
+from data_preparation.domain.value_objects import DateUnixtime
+from data_preparation.infrastructure.in_memory.uow import InMemoryUnitOfWork
 
 
 @dataclass
@@ -42,8 +42,13 @@ def load_irc_dataset_to_memory(
         chat_export = ChatExport.create(
             chat_id=chat_id,
             owner_id=OwnerTelegramID(value=0),
-            export_file_key=ExportFileKey(value=f"eval-{chat_id.value}.json"),
+            target_user_name=UserName(value=channel_data["name"]),
+            file_reference=FileReference(
+                bucket="",
+                key=str(f"eval-{chat_id.value}.json")
+            ),
         )
+        chat_export.mark_ingested()
         uow.chat_export.create(chat_export)
 
         sorted_messages = sorted(
