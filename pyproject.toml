@@ -31,11 +31,60 @@ managed = true
 dev-dependencies = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "src/inference_server.py",
+    "src/app.py",
+    "src/dependencies.py",
+    "src/config.py",
+    "src/constants.py",
+    "src/utils.py",
+    "src/handlers/*",
+    "src/infrastructure/llm/mlx_engine.py",
+    "src/infrastructure/llm/http_inference_engine.py",
+    "src/infrastructure/celery/*",
+    "src/infrastructure/db/*",
+    "src/infrastructure/outbox_worker/*",
+    "src/*/infrastructure/db/*",
+    "src/*/infrastructure/sql/*",
+    "src/*/infrastructure/local/*",
+    "src/*/infrastructure/llm/*",
+    "src/bot_operations/infrastructure/aiogram_bot_runner.py",
+    "src/bot_operations/infrastructure/bot_reconciler.py",
+    "src/bot_operations/infrastructure/dummy_bot_runner.py",
+    "src/bot_operations/infrastructure/local_persona_reply_service.py",
+    "src/model_engine/application/services/*",
+    "src/model_engine/application/constants.py",
+    "src/common/exceptions/*",
+    "src/eval/*",
+    "src/scripts/*",
+    "src/ml_pipeline/*",
+    "*/__init__.py",
+    "*/i_*.py",
+    "*/persona_reply_service.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@(abc\\.)?abstractmethod",
+    "\\.\\.\\.",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -63,3 +112,4 @@ reset = { cmd = "python src/scripts/reset.py", env-file = ".env" }
 logout-main-bot = { cmd = "python src/scripts/logout_main_bot.py", env-file = ".env" }
 
 test = { cmd = "pytest", env = { PYTHONDONTWRITEBYTECODE = "1" } }
+test-cov = { cmd = "pytest --cov=src --cov-report=term-missing --cov-report=html", env = { PYTHONDONTWRITEBYTECODE = "1" } }
