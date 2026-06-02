@@ -28,7 +28,14 @@ build-backend = "hatchling.build"
 
 [tool.rye]
 managed = true
-dev-dependencies = []
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -54,3 +61,5 @@ start-all = "sh -c 'trap \"kill 0\" EXIT INT TERM; rye run inference-server & ry
 trigger = { cmd = "python src/scripts/trigger.py", env-file = ".env" }
 reset = { cmd = "python src/scripts/reset.py", env-file = ".env" }
 logout-main-bot = { cmd = "python src/scripts/logout_main_bot.py", env-file = ".env" }
+
+test = { cmd = "pytest", env = { PYTHONDONTWRITEBYTECODE = "1" } }
