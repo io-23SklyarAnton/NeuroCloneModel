@@ -7,7 +7,7 @@ import aiohttp
 from infrastructure.llm.i_inference_engine import IInferenceEngine
 
 
-_DEFAULT_GENERATE_TIMEOUT_SECONDS: float = 120.0
+_DEFAULT_GENERATE_TIMEOUT_SECONDS: float = 600.0
 
 
 class HttpInferenceEngine(IInferenceEngine):

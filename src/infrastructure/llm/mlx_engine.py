@@ -15,7 +15,7 @@ import mlx.utils as mx_utils
 import numpy as np
 from mlx_lm import generate, load
 from mlx_lm.models.cache import make_prompt_cache
-from mlx_lm.sample_utils import make_sampler
+from mlx_lm.sample_utils import make_logits_processors, make_sampler
 from mlx_lm.tuner.utils import linear_to_lora_layers
 
 import constants
@@ -51,10 +51,10 @@ class MLXInferenceEngine(IInferenceEngine):
         kwargs: dict[str, Any] = dataclasses.field(compare=False)
 
     _LORA_PARAMETERS: dict[str, Any] = {
-        "rank": 4,
+        "rank": 8,
         "alpha": 16.0,
         "scale": 2.0,
-        "dropout": 0.05,
+        "dropout": 0.1,
     }
     _BUCKET_CANDIDATES: list[int] = [128, 256, 512, 1024, 2048, 4096]
     _SNAPSHOT_EVERY_N_BATCHES: int = 1
@@ -67,6 +67,7 @@ class MLXInferenceEngine(IInferenceEngine):
         self._model: Optional[nn.Module] = None
         self._tokenizer: Any = None
         self._active_lora_path: Optional[str] = None
+        self._lora_wrapped: bool = False
         self._frozen_system_prompt: Optional[str] = None
         self._frozen_cache_state: Optional[list[list[mx.array]]] = None
         self._queue: Optional[asyncio.PriorityQueue] = None
@@ -99,6 +100,95 @@ class MLXInferenceEngine(IInferenceEngine):
         )
         return await future
 
+    async def evaluate_loss(
+            self,
+            jsonl_path: str,
+            adapter_path: Optional[str],
+    ) -> dict[str, float]:
+        self._ensure_worker_started()
+        future: asyncio.Future = asyncio.get_running_loop().create_future()
+
+        async def _run() -> None:
+            async with self._gpu_lock:
+                try:
+                    result: dict[str, float] = await asyncio.to_thread(
+                        self._sync_evaluate_loss, jsonl_path, adapter_path,
+                    )
+                    self._set_future_result(future, result)
+                except Exception as e:
+                    self._set_future_exception(future, e)
+
+        asyncio.create_task(_run())
+        return await future
+
+    def _sync_evaluate_loss(
+            self,
+            jsonl_path: str,
+            adapter_path: Optional[str],
+    ) -> dict[str, float]:
+        snapshot: Optional[dict[str, mx.array]] = None
+        if self._is_training:
+            if adapter_path != self._active_training_adapter_path:
+                snapshot = self._snapshot_training_lora_weights()
+                self._apply_adapter_for_inference(adapter_path)
+            self._invalidate_frozen_cache()
+        else:
+            self._switch_lora_if_needed(adapter_path)
+
+        try:
+            self._model.eval()
+            examples: list[_TrainExample] = self._load_train_examples(Path(jsonl_path))
+            if not examples:
+                return {
+                    "avg_loss": 0.0,
+                    "perplexity": float("nan"),
+                    "n_samples": 0,
+                    "n_tokens": 0,
+                }
+
+            total_loss: float = 0.0
+            total_tokens: float = 0.0
+            n_samples: int = 0
+            for example in examples:
+                inputs_np: np.ndarray = np.array(example.tokens[:-1], dtype=np.int32)[None]
+                targets_np: np.ndarray = np.array(example.tokens[1:], dtype=np.int32)[None]
+                seq_len: int = len(example.tokens) - 1
+                mask_np: np.ndarray = np.zeros((1, seq_len), dtype=np.float32)
+                response_start: int = max(0, example.prefix_len - 1)
+                if response_start >= seq_len:
+                    continue
+                mask_np[0, response_start:seq_len] = 1.0
+
+                inputs_b: mx.array = mx.array(inputs_np)
+                targets_b: mx.array = mx.array(targets_np)
+                mask_b: mx.array = mx.array(mask_np)
+
+                logits: mx.array = self._model(inputs_b).astype(mx.float32)
+                ce: mx.array = nn.losses.cross_entropy(logits, targets_b, reduction="none")
+                masked: mx.array = ce * mask_b
+                token_count: float = float(mask_b.sum().item())
+                if token_count <= 0:
+                    continue
+                sample_loss: float = float(masked.sum().item())
+                total_loss += sample_loss
+                total_tokens += token_count
+                n_samples += 1
+                mx.eval(logits)
+
+            avg_loss: float = total_loss / total_tokens if total_tokens > 0 else 0.0
+            perplexity: float = float(np.exp(avg_loss)) if avg_loss < 50.0 else float("inf")
+            return {
+                "avg_loss": avg_loss,
+                "perplexity": perplexity,
+                "n_samples": n_samples,
+                "n_tokens": int(total_tokens),
+            }
+        finally:
+            if snapshot is not None:
+                self._restore_training_lora_weights(snapshot)
+                self._invalidate_frozen_cache()
+            self._safe_clear_cache()
+
     async def train_lora(
             self,
             train_data_path: str,
@@ -112,17 +202,20 @@ class MLXInferenceEngine(IInferenceEngine):
         self._active_training_adapter_path = adapter_path
 
         try:
-            async with self._gpu_lock:
-                setup_result: Optional[tuple[StepFn, BucketPlan]] = await asyncio.to_thread(
-                    self._setup_training,
-                    train_data_path,
-                )
+            bucket_plan: BucketPlan = await asyncio.to_thread(
+                self._prepare_dataset_buckets,
+                Path(train_data_path),
+            )
 
-            if setup_result is None:
+            if not bucket_plan:
                 print("No training batches available.")
                 return
 
-            step_fn, bucket_plan = setup_result
+            self._log_bucket_summary(bucket_plan)
+
+            async with self._gpu_lock:
+                step_fn: StepFn = await asyncio.to_thread(self._setup_model_for_training)
+
             await self._run_training_with_yielding(
                 bucket_plan=bucket_plan,
                 step_fn=step_fn,
@@ -148,6 +241,8 @@ class MLXInferenceEngine(IInferenceEngine):
             raise ValueError(f"Unsupported model: {base_model}")
 
         self._model, self._tokenizer = load(base_model_path)
+        self._lora_wrapped = False
+        self._active_lora_path = None
 
     def _ensure_worker_started(self) -> None:
         if self._queue is not None:
@@ -259,6 +354,11 @@ class MLXInferenceEngine(IInferenceEngine):
                 sampler=make_sampler(
                     temp=temp,
                     top_p=constants.IMITATION_TOP_P,
+                    min_p=constants.IMITATION_MIN_P,
+                ),
+                logits_processors=make_logits_processors(
+                    repetition_penalty=constants.IMITATION_REPETITION_PENALTY,
+                    repetition_context_size=constants.IMITATION_REPETITION_CONTEXT_SIZE,
                 ),
                 verbose=False,
             )
@@ -283,16 +383,36 @@ class MLXInferenceEngine(IInferenceEngine):
             lora_path: Optional[str],
     ) -> None:
         if lora_path is None:
-            self._load_base_model(self._base_model)
+            if self._lora_wrapped:
+                self._zero_lora_adapter_weights()
             return
 
         adapter_file = Path(lora_path)
         if not adapter_file.exists():
             raise FileNotFoundError(f"Adapter weights not found: {adapter_file}")
 
-        linear_to_lora_layers(self._model, constants.LORA_LAYERS, self._LORA_PARAMETERS)
+        if not self._lora_wrapped:
+            linear_to_lora_layers(self._model, constants.LORA_LAYERS, self._LORA_PARAMETERS)
+            self._lora_wrapped = True
+
         weights = dict(mx.load(str(adapter_file)))
         self._model.load_weights(list(weights.items()), strict=False)
+        mx.eval(self._model.parameters())
+        self._model.eval()
+
+    def _zero_lora_adapter_weights(self) -> None:
+        all_params: dict[str, mx.array] = dict(
+            mx_utils.tree_flatten(self._model.parameters())
+        )
+        zeroed: list[tuple[str, mx.array]] = [
+            (name, mx.zeros_like(weight))
+            for name, weight in all_params.items()
+            if name.endswith(".lora_a") or name.endswith(".lora_b")
+        ]
+        if not zeroed:
+            return
+
+        self._model.load_weights(zeroed, strict=False)
         mx.eval(self._model.parameters())
         self._model.eval()
 
@@ -364,6 +484,7 @@ class MLXInferenceEngine(IInferenceEngine):
             sys_messages,
             tokenize=False,
             add_generation_prompt=False,
+            enable_thinking=False,
         )
 
     def _build_delta_tokens(
@@ -381,6 +502,7 @@ class MLXInferenceEngine(IInferenceEngine):
             full_messages,
             tokenize=False,
             add_generation_prompt=True,
+            enable_thinking=False,
         )
         full_text += assistant_prefill
         full_tokens: list[int] = self._tokenizer.encode(full_text)
@@ -430,23 +552,13 @@ class MLXInferenceEngine(IInferenceEngine):
 
         self._frozen_system_prompt = system_prompt
 
-    def _setup_training(
-            self,
-            train_data_path: str,
-    ) -> Optional[tuple[StepFn, BucketPlan]]:
+    def _setup_model_for_training(self) -> StepFn:
         self._safe_clear_cache()
         self._prepare_model_for_training()
-
         optimizer: optim.Adam = self._create_lora_optimizer()
-        bucket_plan: BucketPlan = self._prepare_dataset_buckets(Path(train_data_path))
-
-        if not bucket_plan:
-            return None
-
-        self._log_bucket_summary(bucket_plan)
         step_fn: StepFn = self._build_step_fn(optimizer)
         self._safe_reset_peak_memory()
-        return step_fn, bucket_plan
+        return step_fn
 
     def _cleanup_after_training(self) -> None:
         self._model.eval()
@@ -460,6 +572,7 @@ class MLXInferenceEngine(IInferenceEngine):
             constants.LORA_LAYERS,
             self._LORA_PARAMETERS,
         )
+        self._lora_wrapped = True
         self._enable_gradient_checkpointing()
         mx.eval(self._model.parameters())
 
@@ -766,6 +879,7 @@ class MLXInferenceEngine(IInferenceEngine):
             messages[:-1],
             tokenize=False,
             add_generation_prompt=True,
+            enable_thinking=False
         )
         prompt_tokens: list[int] = self._tokenizer.encode(prompt_text)
         prefix_len: int = len(prompt_tokens)
@@ -774,6 +888,7 @@ class MLXInferenceEngine(IInferenceEngine):
             messages,
             tokenize=False,
             add_generation_prompt=False,
+            enable_thinking=False,
         )
         full_tokens: list[int] = self._tokenizer.encode(full_text)
         if len(full_tokens) > max_seq:
