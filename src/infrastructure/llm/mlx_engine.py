@@ -75,6 +75,7 @@ class MLXInferenceEngine(IInferenceEngine):
         self._gpu_lock: asyncio.Lock = asyncio.Lock()
         self._is_training: bool = False
         self._active_training_adapter_path: Optional[str] = None
+        self._checkpointed_layer_classes: set[type] = set()
 
         self._load_base_model(base_model)
 
@@ -565,6 +566,10 @@ class MLXInferenceEngine(IInferenceEngine):
         self._safe_clear_cache()
 
     def _prepare_model_for_training(self) -> None:
+        if self._lora_wrapped:
+            self._load_base_model(self._base_model)
+            self._invalidate_frozen_cache()
+
         self._model.train()
         self._model.freeze()
         linear_to_lora_layers(
@@ -580,8 +585,13 @@ class MLXInferenceEngine(IInferenceEngine):
         if not hasattr(self._model, "layers") or not self._model.layers:
             return
 
+        layer_cls: type = type(self._model.layers[0])
+        if layer_cls in self._checkpointed_layer_classes:
+            return
+
         try:
             self._wrap_layer_with_checkpointing(self._model.layers[0])
+            self._checkpointed_layer_classes.add(layer_cls)
             print("Gradient checkpointing enabled.")
         except Exception as e:
             print(f"Could not enable gradient checkpointing: {e}")

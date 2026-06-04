@@ -13,7 +13,6 @@ src/eval/cache/*
 src/eval/tests
 src/eval/adapters
 src/eval/manual_tests
-.claude
 */.env
 .env
 storage
