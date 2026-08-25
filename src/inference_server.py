@@ -6,12 +6,12 @@ from aiohttp import web
 
 import config
 import constants
-from infrastructure.llm.mlx_engine import MLXInferenceEngine
+from infrastructure.llm.cuda_engine import CUDAInferenceEngine
 
 
 _logger = logging.getLogger("inference_server")
 
-_ENGINE_KEY: web.AppKey[MLXInferenceEngine] = web.AppKey("engine", MLXInferenceEngine)
+_ENGINE_KEY: web.AppKey[CUDAInferenceEngine] = web.AppKey("engine", CUDAInferenceEngine)
 
 
 def _setup_logging() -> None:
@@ -34,7 +34,7 @@ def _resolve_base_model() -> constants.AvailableModel:
 
 
 async def _generate_handler(request: web.Request) -> web.Response:
-    engine: MLXInferenceEngine = request.app[_ENGINE_KEY]
+    engine: CUDAInferenceEngine = request.app[_ENGINE_KEY]
     payload: dict[str, Any] = await request.json()
 
     text: str = await engine.generate_async(
@@ -50,7 +50,7 @@ async def _generate_handler(request: web.Request) -> web.Response:
 
 
 async def _train_lora_handler(request: web.Request) -> web.Response:
-    engine: MLXInferenceEngine = request.app[_ENGINE_KEY]
+    engine: CUDAInferenceEngine = request.app[_ENGINE_KEY]
     payload: dict[str, Any] = await request.json()
 
     await engine.train_lora(
@@ -68,7 +68,7 @@ def _build_app(base_model: constants.AvailableModel) -> web.Application:
     app: web.Application = web.Application(
         client_max_size=10 * 1024 * 1024,
     )
-    engine: MLXInferenceEngine = MLXInferenceEngine(base_model=base_model)
+    engine: CUDAInferenceEngine = CUDAInferenceEngine(base_model=base_model)
     app[_ENGINE_KEY] = engine
 
     app.router.add_post("/generate", _generate_handler)
