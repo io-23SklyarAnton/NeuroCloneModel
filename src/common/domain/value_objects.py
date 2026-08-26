@@ -5,11 +5,12 @@ __all__ = [
     "OwnerTelegramID",
     "FileReference",
     "ReplyPeriod",
+    "DocumentChunk",
 ]
 
 import abc
 import uuid
-from typing import Self
+from typing import Self, Any
 
 import pydantic
 
@@ -101,3 +102,11 @@ class ReplyPeriod(ValueObject):
             raise ValueError("Reply period must be at least 1.")
 
         return self
+
+
+class DocumentChunk(ValueObject):
+    text: str
+    metadata: dict[str, Any]
+
+    def __eq__(self, other: Any) -> bool:
+        raise NotImplementedError
